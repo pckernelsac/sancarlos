@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Carga Masiva de Estudiantes{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{{ url_for('students.list_students') }}" class="text-brand hover:underline text-sm flex items-center gap-1">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Volver
+    </a>
+    <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+      <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold text-brand">Carga Masiva — Excel</h1>
+      <p class="text-sm text-gray-500">Importación de estudiantes desde archivo Excel</p>
+    </div>
+  </div>
+
+  <!-- Instrucciones + descarga plantilla -->
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+    <h2 class="font-bold text-brand mb-3 flex items-center gap-2">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Instrucciones
+    </h2>
+    <ul class="text-sm text-gray-700 space-y-1 list-disc list-inside">
+      <li>Descarga la plantilla y completa los datos desde la fila <strong>2</strong>.</li>
+      <li>Columnas obligatorias: <strong>APELLIDO_PATERNO, NOMBRES, GRADO, SECCION</strong>.</li>
+      <li>El <strong>CODIGO</strong> se genera automáticamente (iniciales apellidos + año + correlativo).</li>
+      <li>Valores válidos para GRADO: <strong>{{ grados | join(', ') }}</strong>.</li>
+      <li>Valores válidos para SECCION: <strong>{{ secciones | join(', ') }}</strong>.</li>
+      <li>Fecha de nacimiento en formato <strong>DD/MM/YYYY</strong>.</li>
+      <li>Si se incluye <strong>DNI</strong> y ya existe un estudiante con ese DNI, el registro se <strong>actualiza</strong>.</li>
+    </ul>
+    <a href="{{ url_for('students.download_template') }}"
+       class="inline-flex items-center gap-2 mt-4 bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      Descargar Plantilla Excel
+    </a>
+  </div>
+
+  <!-- Formulario de upload -->
+  <form method="POST" enctype="multipart/form-data"
+        action="{{ url_for('students.upload_excel') }}"
+        id="upload-form"
+        class="bg-white rounded-xl shadow p-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- Zona drag & drop -->
+    <div id="drop-zone"
+         class="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer
+                hover:border-brand hover:bg-blue-50 transition-colors"
+         onclick="document.getElementById('excel_file').click()">
+      <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p class="text-gray-500 font-medium">Arrastra tu archivo aquí o <span class="text-brand underline">haz clic para seleccionar</span></p>
+      <p class="text-xs text-gray-400 mt-1">Solo archivos .xlsx (Excel 2007+)</p>
+      <p id="file-name" class="mt-3 text-sm font-semibold text-brand hidden"></p>
+    </div>
+
+    <input type="file" id="excel_file" name="excel_file" accept=".xlsx"
+           class="hidden" onchange="handleFileSelect(this)"/>
+
+    <div class="flex gap-3 mt-6">
+      <button type="submit" id="submit-btn"
+              class="bg-brand text-white px-8 py-3 rounded-lg font-bold text-base hover:bg-brand-light transition disabled:opacity-50 flex items-center gap-2"
+              disabled>
+        <svg id="btn-spinner" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+        <span id="btn-text">Importar Estudiantes</span>
+      </button>
+      <a href="{{ url_for('students.list_students') }}"
+         class="px-6 py-3 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition font-medium">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const nameEl  = document.getElementById('file-name');
+  const submitBtn = document.getElementById('submit-btn');
+  const dropZone  = document.getElementById('drop-zone');
+
+  nameEl.textContent = file.name;
+  nameEl.classList.remove('hidden');
+  submitBtn.disabled = false;
+  dropZone.classList.add('border-brand', 'bg-blue-50');
+}
+
+// Drag & drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-brand', 'bg-blue-50'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-blue-50'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  const dt = e.dataTransfer;
+  if (dt.files.length) {
+    document.getElementById('excel_file').files = dt.files;
+    handleFileSelect(document.getElementById('excel_file'));
+  }
+});
+
+// Bloquea botón y muestra spinner al enviar
+document.getElementById('upload-form').addEventListener('submit', function () {
+  const btn    = document.getElementById('submit-btn');
+  const spinner = document.getElementById('btn-spinner');
+  const text    = document.getElementById('btn-text');
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  text.textContent = 'Procesando...';
+});
+</script>
+{% endblock %}

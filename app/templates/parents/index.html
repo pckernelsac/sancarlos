@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Responsabilidad PPFF{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-5">
+  <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+    <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-brand">Registro de Responsabilidad PPFF — {{ anio }}</h1>
+    <p class="text-sm text-gray-500">Evaluación de responsabilidad del padre de familia o apoderado</p>
+  </div>
+</div>
+
+<form method="GET" id="filter-form" class="bg-white rounded-xl shadow p-4 mb-5 flex flex-wrap gap-3 items-end">
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Nivel</label>
+    <select name="nivel" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      {% for n in niveles %}<option value="{{ n }}" {% if n==nivel %}selected{% endif %}>{{ n }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Grado</label>
+    <select name="grado" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Grado --</option>
+      {% for g in grados %}<option value="{{ g }}" {% if g==grado %}selected{% endif %}>{{ g }}</option>{% endfor %}
+    </select>
+  </div>
+  <input type="hidden" name="seccion" value="A">
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Bimestre</label>
+    <select name="term_id" id="sel-term" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"
+            onchange="this.form.submit()">
+      <option value="">-- Bimestre --</option>
+      {% for t in terms %}<option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <input type="hidden" name="anio" value="{{ anio }}">
+  <button type="submit" class="bg-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-light transition flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+    Cargar
+  </button>
+</form>
+
+{% if term_locked %}
+<div class="bg-red-50 border border-red-300 rounded-xl p-4 mb-4 flex items-center gap-3">
+  <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+  </svg>
+  <span class="text-sm font-semibold text-red-700">Este bimestre está bloqueado. Las calificaciones no pueden ser modificadas.</span>
+</div>
+{% endif %}
+
+{% if students_data %}
+<div id="ppff-status" class="text-sm h-5 mb-2"></div>
+<div class="table-wrap bg-white rounded-xl shadow">
+  <table class="text-sm w-full">
+    <thead class="bg-brand text-white text-xs uppercase">
+      <tr>
+        <th class="px-4 py-3 text-left min-w-[180px]">Estudiante</th>
+        {% for ind in indicadores %}
+        <th class="px-3 py-3 text-center min-w-[120px]">{{ ind }}</th>
+        {% endfor %}
+        <th class="px-3 py-3 text-center min-w-[100px] bg-blue-900">Promedio</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in students_data %}
+      <tr class="border-b hover:bg-gray-50" data-student-row="{{ item.student.id }}">
+        <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">{{ item.student.full_name }}</td>
+        {% for ind in indicadores %}
+        {% set p = item.ppff.get(ind) %}
+        <td class="px-3 py-2 text-center">
+          <div class="inline-flex items-center gap-1.5">
+            <input type="number" min="0" max="20"
+                   class="ppff-input border border-gray-200 rounded px-2 py-1.5 text-sm text-center w-16 focus:ring-2 focus:ring-brand focus:outline-none {% if term_locked %}bg-gray-100 cursor-not-allowed{% endif %}"
+                   data-student="{{ item.student.id }}"
+                   data-indicador="{{ ind }}"
+                   data-term-id="{{ term_id }}"
+                   value="{% if p and p.calificacion is not none %}{{ p.calificacion }}{% endif %}"
+                   placeholder="--"
+                   {% if term_locked %}disabled{% endif %}>
+            <span class="ppff-qual text-xs font-bold w-7 {% if p and p.qualitative_grade %}text-brand{% else %}text-gray-300{% endif %}">
+              {{ p.qualitative_grade if p and p.qualitative_grade else '--' }}
+            </span>
+          </div>
+        </td>
+        {% endfor %}
+        <td class="px-3 py-2 text-center bg-blue-50">
+          <div class="inline-flex items-center gap-1.5">
+            <span class="ppff-prom-num font-bold text-brand text-base" data-student-prom="{{ item.student.id }}">
+              {{ item.promedio.promedio_num if item.promedio.promedio_num is not none else '--' }}
+            </span>
+            <span class="ppff-prom-qual text-xs font-bold px-1.5 py-0.5 rounded
+              {% if item.promedio.promedio_cual == 'AD' %}badge-AD
+              {% elif item.promedio.promedio_cual == 'A' %}badge-A
+              {% elif item.promedio.promedio_cual == 'B' %}badge-B
+              {% elif item.promedio.promedio_cual == 'C' %}badge-C
+              {% else %}text-gray-300{% endif %}"
+              data-student-prom-qual="{{ item.student.id }}">
+              {{ item.promedio.promedio_cual }}
+            </span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs text-gray-400 mt-2">Los cambios se guardan automáticamente. El promedio considera todos los bimestres del año.</p>
+{% elif grado and seccion and term_id %}
+<div class="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+  No se encontraron estudiantes activos para el aula seleccionada.
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+  Seleccione nivel, grado, sección y bimestre para registrar responsabilidad de PPFF.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PPFF_URL    = "{{ url_for('parents.save') }}";
+const CSRF_TOKEN = "{{ csrf_token() }}";
+
+function showPpffStatus(msg, ok = true) {
+  const el = document.getElementById('ppff-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `text-sm h-5 font-medium ${ok ? 'text-green-600' : 'text-red-600'}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ''; }, 2000);
+}
+
+function qualGrade(v) {
+  if (v === '' || v === null || isNaN(v)) return '--';
+  v = parseInt(v);
+  if (v >= 18) return 'AD';
+  if (v >= 15) return 'A';
+  if (v >= 11) return 'B';
+  return 'C';
+}
+
+function recalcPromedio(studentId) {
+  const row = document.querySelector(`tr[data-student-row="${studentId}"]`);
+  if (!row) return;
+  const inputs = row.querySelectorAll('.ppff-input');
+  const vals = [];
+  inputs.forEach(inp => {
+    const v = inp.value.trim();
+    if (v !== '' && !isNaN(v)) vals.push(parseInt(v));
+  });
+  const promSpan = document.querySelector(`[data-student-prom="${studentId}"]`);
+  const promQual = document.querySelector(`[data-student-prom-qual="${studentId}"]`);
+  if (!promSpan || !promQual) return;
+  if (vals.length === 0) {
+    promSpan.textContent = '--';
+    promQual.textContent = '--';
+    promQual.className = 'ppff-prom-qual text-xs font-bold px-1.5 py-0.5 rounded text-gray-300';
+    return;
+  }
+  const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  promSpan.textContent = avg;
+  const q = qualGrade(avg);
+  promQual.textContent = q;
+  const badgeMap = {'AD': 'badge-AD', 'A': 'badge-A', 'B': 'badge-B', 'C': 'badge-C'};
+  promQual.className = `ppff-prom-qual text-xs font-bold px-1.5 py-0.5 rounded ${badgeMap[q] || 'text-gray-300'}`;
+}
+
+document.querySelectorAll('.ppff-input').forEach(inp => {
+  inp.addEventListener('change', async function () {
+    const val = this.value.trim();
+    if (val !== '' && (parseInt(val) < 0 || parseInt(val) > 20 || isNaN(val))) {
+      showPpffStatus('La nota debe estar entre 0 y 20.', false);
+      return;
+    }
+    const qualSpan = this.nextElementSibling;
+    const studentId = this.dataset.student;
+    this.disabled = true;
+    try {
+      const res = await fetch(PPFF_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({
+          student_id:   studentId,
+          indicador:    this.dataset.indicador,
+          term_id:      this.dataset.termId,
+          calificacion: val,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        const q = qualGrade(val);
+        qualSpan.textContent = q;
+        qualSpan.className = `ppff-qual text-xs font-bold w-7 ${q !== '--' ? 'text-brand' : 'text-gray-300'}`;
+        recalcPromedio(studentId);
+      }
+      showPpffStatus(json.ok ? 'Guardado.' : (json.error || 'Error.'), json.ok);
+    } catch {
+      showPpffStatus('Error de conexión.', false);
+    } finally {
+      this.disabled = false;
+    }
+  });
+});
+</script>
+{% endblock %}

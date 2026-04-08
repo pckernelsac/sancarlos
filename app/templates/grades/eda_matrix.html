@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+{% block title %}Registro EDA{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-5">
+  <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+    <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-brand">Registro de Notas por EDA</h1>
+    <p class="text-sm text-gray-500">Experiencias de Aprendizaje con promedio bimestral</p>
+  </div>
+</div>
+
+{% set readonly_eda = current_user.has_role('DOCENTE') %}
+{% set is_docente = current_user.has_role('DOCENTE') %}
+{% set term_locked = term is defined and term and term.locked %}
+
+{% if readonly_eda %}
+<div class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+  <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+  </svg>
+  <span class="text-sm text-amber-800">
+    Esta vista es de <strong>solo lectura</strong>. Para ingresar o modificar notas, usa el
+    <a href="{{ url_for('grades.registro_auxiliar') }}" class="underline font-bold hover:text-amber-900">Registro Auxiliar</a>.
+  </span>
+</div>
+{% elif allowed_ids is not none %}
+<div class="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+  <svg class="w-5 h-5 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z"/>
+  </svg>
+  <span class="text-sm text-blue-800">
+    Mostrando únicamente tus
+    <strong>{{ allowed_ids|length }} curso{{ 's' if allowed_ids|length != 1 else '' }} asignado{{ 's' if allowed_ids|length != 1 else '' }}</strong>.
+    Para modificar la asignación, contacta al administrador.
+  </span>
+</div>
+{% endif %}
+
+{% if term_locked %}
+<div class="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+  <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+  </svg>
+  <span class="text-sm text-red-800">
+    <strong>Bimestre bloqueado.</strong>
+    {% if current_user.has_role('ADMIN') %}
+    Los docentes no pueden modificar notas. Puedes <a href="{{ url_for('admin.terms') }}" class="underline font-bold">desbloquearlo desde Admin → Bimestres</a>.
+    {% else %}
+    Contacta al administrador para realizar modificaciones.
+    {% endif %}
+  </span>
+</div>
+{% endif %}
+
+<!-- Filtros -->
+<form method="GET" class="bg-white rounded-xl shadow p-4 mb-5 flex flex-wrap gap-3 items-end">
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Nivel</label>
+    <select name="nivel" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      {% for n in niveles %}<option value="{{ n }}" {% if n==nivel %}selected{% endif %}>{{ n }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Grado</label>
+    <select name="grado" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Grado --</option>
+      {% for g in grados %}<option value="{{ g }}" {% if g==grado %}selected{% endif %}>{{ g }}</option>{% endfor %}
+    </select>
+  </div>
+  <input type="hidden" name="seccion" value="A">
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Bimestre</label>
+    <select name="term_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Bimestre --</option>
+      {% for t in terms %}
+      <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.nombre }} {{ t.anio }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <input type="hidden" name="anio" value="{{ anio }}">
+  <button type="submit" class="bg-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-light transition flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+    Cargar
+  </button>
+</form>
+
+{% if students is defined and students and courses and edas %}
+
+<!-- Indicador de guardado -->
+<div id="save-status" class="text-sm h-5 mb-2 font-medium"></div>
+
+<!-- Tabs: una por EDA + tab de Promedio Bimestral -->
+<div class="flex gap-1 mb-0">
+  {% for eda in edas %}
+  <button onclick="showTab('tab-{{ eda.id }}')"
+          id="btn-tab-{{ eda.id }}"
+          class="tab-btn px-5 py-2.5 rounded-t-lg font-semibold text-sm border-b-2 transition
+                 {% if loop.first %}bg-white border-brand text-brand{% else %}bg-gray-100 border-transparent text-gray-500 hover:text-brand{% endif %}">
+    {{ eda.nombre }}
+    {% if eda.locked %}🔒{% endif %}
+    <span class="ml-1 text-[10px] opacity-60">{{ term.nombre }}</span>
+  </button>
+  {% endfor %}
+  <button onclick="showTab('tab-bimestral')"
+          id="btn-tab-bimestral"
+          class="tab-btn px-5 py-2.5 rounded-t-lg font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-brand bg-gray-100 transition ml-auto">
+    Promedio Bimestral
+  </button>
+  <button onclick="showTab('tab-merito')"
+          id="btn-tab-merito"
+          class="tab-btn px-5 py-2.5 rounded-t-lg font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-brand bg-gray-100 transition">
+    Orden de Mérito
+  </button>
+</div>
+
+<!-- ── TABs por EDA ─────────────────────────────────────────────────────── -->
+{% for eda in edas %}
+<div id="tab-{{ eda.id }}" class="tab-panel {% if not loop.first %}hidden{% endif %}">
+  {% if eda.locked and is_docente %}
+  <div class="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-3 flex items-center gap-3">
+    <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+    </svg>
+    <span class="text-sm text-red-800 font-medium">
+      🔒 {{ eda.nombre }} bloqueada. No puedes modificar notas ni comentarios. Contacta al administrador.
+    </span>
+  </div>
+  {% endif %}
+  <div class="table-wrap bg-white rounded-b-xl rounded-tr-xl shadow">
+    <table class="text-sm w-full">
+      <thead class="bg-brand text-white text-xs">
+        <tr>
+          <th class="px-3 py-3 text-left min-w-[180px] sticky left-0 bg-brand">Estudiante</th>
+          {% for course in courses %}
+          <th class="px-2 py-3 text-center min-w-[85px] font-medium">
+            <span title="{{ course.nombre }}">{{ course.nombre | truncate(11, true, '..') }}</span>
+            <div class="text-[9px] opacity-70">{{ course.area }}</div>
+          </th>
+          {% endfor %}
+          <th class="px-3 py-3 text-center min-w-[95px] bg-blue-800 sticky right-0">
+            PROM.<br/><span class="text-[9px] font-normal opacity-80">{{ eda.nombre }}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="px-3 py-2 font-semibold text-gray-800 whitespace-nowrap sticky left-0 bg-white">
+            {{ student.full_name }}
+          </td>
+          {% for course in courses %}
+          {% set val = eda_maps.get(eda.id, {}).get((student.id, course.id)) %}
+          <td class="px-{% if readonly_eda %}2{% else %}1{% endif %} py-{% if readonly_eda %}2{% else %}1{% endif %} text-center">
+            {% if readonly_eda %}
+              {% if val is not none %}
+              {% if nivel == 'INICIAL' %}{% set q = 'A' if val >= 14 else ('B' if val >= 11 else 'C') %}{% else %}{% set q = 'AD' if val >= 18 else ('A' if val >= 14 else ('B' if val >= 11 else 'C')) %}{% endif %}
+              <span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold
+                {% if q=='AD' %}bg-blue-100 text-blue-800
+                {% elif q=='A' %}bg-green-100 text-green-800
+                {% elif q=='B' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-red-100 text-red-800{% endif %}">{{ val }}</span>
+              {% else %}
+              <span class="text-gray-300 text-xs">—</span>
+              {% endif %}
+            {% else %}
+            <input type="number" min="0" max="20"
+                   class="eda-input w-14 text-center border border-gray-200 rounded px-1 py-1 text-sm
+                          focus:ring-2 focus:ring-brand focus:outline-none"
+                   value="{{ val if val is not none else '' }}"
+                   data-student="{{ student.id }}"
+                   data-course="{{ course.id }}"
+                   data-eda="{{ eda.id }}"
+                   data-bim-cell="bim-{{ eda.id }}-{{ student.id }}-{{ course.id }}"
+                   data-avg-cell="avg-eda-{{ eda.id }}-{{ student.id }}"/>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <!-- Promedio del estudiante en esta EDA -->
+          {% set avg_eda = avg_per_student.get(eda.id, {}).get(student.id) %}
+          <td class="px-2 py-2 text-center bg-blue-50 sticky right-0 border-l border-blue-200"
+              id="avg-eda-{{ eda.id }}-{{ student.id }}">
+            {% if avg_eda %}
+            <span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold
+              {% if avg_eda.cual=='AD' %}bg-blue-100 text-blue-800
+              {% elif avg_eda.cual=='A' %}bg-green-100 text-green-800
+              {% elif avg_eda.cual=='B' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ avg_eda.cual }}
+            </span>
+            <div class="text-[10px] text-gray-500 font-semibold">{{ avg_eda.num }}</div>
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-400 mt-1.5 mb-3">
+    Escala: 18-20 AD · 15-17 A · 11-14 B · 0-10 C &nbsp;|&nbsp;
+    El promedio bimestral se recalcula automáticamente al guardar.
+  </p>
+
+  <!-- Observaciones del docente por estudiante -->
+  <div class="bg-white rounded-xl shadow mb-5 p-4">
+    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+      Observaciones del docente — {{ eda.nombre }}
+    </h3>
+    <div class="space-y-2">
+      {% for student in students %}
+      <div class="flex gap-3 items-start">
+        <span class="text-sm font-semibold text-gray-700 w-52 shrink-0 pt-2 leading-tight">
+          {{ student.full_name }}
+        </span>
+        {% set comment_locked = term_locked or (eda.locked and is_docente) %}
+        <textarea
+          class="eda-comment flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none
+                 focus:ring-2 focus:ring-brand focus:outline-none
+                 {{ 'bg-gray-50 text-gray-500 cursor-not-allowed' if comment_locked else '' }}"
+          rows="2"
+          maxlength="1000"
+          placeholder="Observación o comentario (opcional)..."
+          data-student="{{ student.id }}"
+          data-eda="{{ eda.id }}"
+          {% if comment_locked %}disabled{% endif %}
+        >{{ comment_map.get(eda.id, {}).get(student.id, '') }}</textarea>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- ── TAB Promedio Bimestral (solo lectura, auto-calculado) ────────────── -->
+<div id="tab-bimestral" class="tab-panel hidden">
+  <div class="table-wrap bg-white rounded-b-xl rounded-tl-xl shadow">
+    <table class="text-sm w-full">
+      <thead class="bg-indigo-700 text-white text-xs">
+        <tr>
+          <th class="px-3 py-3 text-left min-w-[180px] sticky left-0 bg-indigo-700">Estudiante</th>
+          {% for course in courses %}
+          <th class="px-2 py-3 text-center min-w-[85px]">
+            <span title="{{ course.nombre }}">{{ course.nombre | truncate(11, true, '..') }}</span>
+            <div class="text-[9px] opacity-70">{{ course.area }}</div>
+          </th>
+          {% endfor %}
+          <th class="px-3 py-3 text-center min-w-[95px] bg-indigo-900 sticky right-0">
+            PROM.<br/><span class="text-[9px] font-normal opacity-80">Bimestral</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="px-3 py-2 font-semibold text-gray-800 whitespace-nowrap sticky left-0 bg-white">
+            {{ student.full_name }}
+          </td>
+          {% for course in courses %}
+          {% set bval = bim_map.get((student.id, course.id)) %}
+          <td class="px-2 py-2 text-center"
+              id="bimcell-{{ student.id }}-{{ course.id }}">
+            {% if bval is not none %}
+            {% if nivel == 'INICIAL' %}{% set bqual = 'A' if bval >= 14 else ('B' if bval >= 11 else 'C') %}{% else %}{% set bqual = 'AD' if bval >= 18 else ('A' if bval >= 14 else ('B' if bval >= 11 else 'C')) %}{% endif %}
+            <span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold
+              {% if bqual=='AD' %}bg-blue-100 text-blue-800
+              {% elif bqual=='A' %}bg-green-100 text-green-800
+              {% elif bqual=='B' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ bqual }}
+            </span>
+            <div class="text-[10px] text-gray-400">{{ bval }}</div>
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <!-- Promedio bimestral total del estudiante -->
+          {% set ba = bim_avg.get(student.id) %}
+          <td class="px-2 py-2 text-center bg-indigo-50 sticky right-0 border-l border-indigo-200"
+              id="bim-avg-{{ student.id }}">
+            {% if ba %}
+            <span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold
+              {% if ba.cual=='AD' %}bg-blue-100 text-blue-800
+              {% elif ba.cual=='A' %}bg-green-100 text-green-800
+              {% elif ba.cual=='B' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ ba.cual }}
+            </span>
+            <div class="text-[10px] text-gray-500 font-semibold">{{ ba.num }}</div>
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-400 mt-1.5">
+    Promedio calculado automáticamente como el promedio de las dos EDAs del bimestre.
+    Este valor se usa en la boleta de notas.
+  </p>
+</div>
+
+<!-- ── TAB Orden de Mérito ───────────────────────────────────────────────── -->
+<div id="tab-merito" class="tab-panel hidden">
+  <div class="bg-white rounded-b-xl rounded-tl-xl shadow overflow-hidden">
+    <!-- Cabecera informativa -->
+    <div class="bg-emerald-700 text-white px-5 py-3 flex items-center justify-between">
+      <div>
+        <span class="font-bold text-sm">Promedio Final — {{ term.nombre }} {{ term.anio }}</span>
+        <span class="ml-3 text-xs opacity-75">Grado: {{ grado }}° · Sección: {{ seccion }}</span>
+      </div>
+      <span class="text-xs opacity-75">{{ merit_order | selectattr('avg') | list | length }} estudiantes calificados</span>
+    </div>
+
+    <table class="text-sm w-full">
+      <thead class="bg-emerald-50 text-emerald-900 text-xs border-b border-emerald-200">
+        <tr>
+          <th class="px-4 py-3 text-center w-14">Orden</th>
+          <th class="px-4 py-3 text-left">Apellidos y Nombres</th>
+          {% for course in courses %}
+          <th class="px-2 py-3 text-center min-w-[70px] font-medium text-gray-500">
+            <span title="{{ course.nombre }}">{{ course.nombre | truncate(9, true, '..') }}</span>
+          </th>
+          {% endfor %}
+          <th class="px-4 py-3 text-center min-w-[100px] bg-emerald-100 font-bold text-emerald-800">
+            PROM. FINAL
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in merit_order %}
+        {% set student = item.student %}
+        {% set avg     = item.avg %}
+        {% set rank    = item.rank %}
+        <tr class="border-b hover:bg-gray-50
+          {% if rank == 1 and avg %}bg-yellow-50{% endif %}">
+          <!-- Posición -->
+          <td class="px-4 py-3 text-center">
+            {% if rank %}
+            <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
+              {% if rank == 1 %}bg-yellow-400 text-yellow-900
+              {% elif rank == 2 %}bg-gray-300 text-gray-800
+              {% elif rank == 3 %}bg-amber-600 text-white
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ rank }}
+            </span>
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Nombre -->
+          <td class="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">
+            {{ student.full_name }}
+          </td>
+
+          <!-- Nota bimestral por curso -->
+          {% for course in courses %}
+          {% set bval = bim_map.get((student.id, course.id)) %}
+          <td class="px-2 py-3 text-center">
+            {% if bval is not none %}
+            {% if nivel == 'INICIAL' %}{% set bq = 'A' if bval >= 14 else ('B' if bval >= 11 else 'C') %}{% else %}{% set bq = 'AD' if bval >= 18 else ('A' if bval >= 14 else ('B' if bval >= 11 else 'C')) %}{% endif %}
+            <span class="inline-block px-1 py-0.5 rounded text-[11px] font-bold
+              {% if bq=='AD' %}bg-blue-100 text-blue-800
+              {% elif bq=='A' %}bg-green-100 text-green-800
+              {% elif bq=='B' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ bval }}
+            </span>
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+
+          <!-- Promedio final -->
+          <td class="px-4 py-3 text-center bg-emerald-50 border-l border-emerald-200">
+            {% if avg %}
+            <span class="inline-block px-2 py-0.5 rounded text-sm font-bold
+              {% if avg.cual=='AD' %}bg-blue-100 text-blue-800
+              {% elif avg.cual=='A' %}bg-green-100 text-green-800
+              {% elif avg.cual=='B' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ avg.cual }}
+            </span>
+            <div class="text-xs text-gray-600 font-bold mt-0.5">{{ avg.num }}</div>
+            {% else %}
+            <span class="text-gray-300 text-xs">Sin notas</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-400 mt-1.5">
+    Ranking calculado sobre el promedio bimestral (promedio de las dos EDAs del bimestre por cada curso).
+    Empates comparten el mismo puesto.
+  </p>
+</div>
+
+{% elif grado and seccion and term_id %}
+<div class="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-yellow-800 text-sm">
+  No hay estudiantes, cursos o EDAs configuradas para esta selección.
+  {% if current_user.has_role('ADMIN') %}
+  Verifica que existan bimestres con EDAs en
+  <a href="{{ url_for('admin.terms') }}" class="underline font-semibold">Administración → Bimestres</a>.
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EDA_SAVE_URL    = "{{ url_for('grades.save_eda_grade') }}";
+const EDA_COMMENT_URL = "{{ url_for('grades.save_eda_comment') }}";
+const CSRF_TOKEN      = "{{ csrf_token() }}";
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+function showTab(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('bg-white', 'border-brand', 'text-brand');
+    b.classList.add('bg-gray-100', 'border-transparent', 'text-gray-500');
+  });
+  document.getElementById(tabId).classList.remove('hidden');
+  const btn = document.getElementById('btn-' + tabId);
+  if (btn) {
+    btn.classList.add('bg-white', 'border-brand', 'text-brand');
+    btn.classList.remove('bg-gray-100', 'border-transparent', 'text-gray-500');
+  }
+}
+
+/* ── Helpers visuales ──────────────────────────────────────────────────── */
+const NIVEL_ACTUAL = '{{ nivel }}';
+function toQual(n) {
+  if (n === null || n === undefined) return '--';
+  if (NIVEL_ACTUAL === 'INICIAL') {
+    if (n >= 14) return 'A';
+    if (n >= 11) return 'B';
+    return 'C';
+  }
+  if (n >= 18) return 'AD';
+  if (n >= 14) return 'A';
+  if (n >= 11) return 'B';
+  return 'C';
+}
+const QUAL_CLASS = {
+  AD: 'bg-blue-100 text-blue-800',
+  A:  'bg-green-100 text-green-800',
+  B:  'bg-yellow-100 text-yellow-800',
+  C:  'bg-red-100 text-red-800',
+};
+function badgeHTML(num) {
+  if (num === null || num === undefined) return '<span class="text-gray-300 text-xs">—</span>';
+  const q = toQual(num);
+  return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold ${QUAL_CLASS[q]}">${q}</span>
+          <div class="text-[10px] text-gray-500 font-semibold">${num}</div>`;
+}
+
+function showStatus(msg, ok = true) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `text-sm h-5 font-medium ${ok ? 'text-green-600' : 'text-red-600'}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
+/* ── Promedio EDA en tiempo real ──────────────────────────────────────── */
+function updateEdaAvg(edaId, studentId) {
+  const cell   = document.getElementById(`avg-eda-${edaId}-${studentId}`);
+  if (!cell) return;
+  const inputs = document.querySelectorAll(`.eda-input[data-eda="${edaId}"][data-student="${studentId}"]`);
+  const vals   = Array.from(inputs)
+    .map(i => i.value.trim()).filter(v => v !== '')
+    .map(v => parseInt(v, 10)).filter(v => !isNaN(v) && v >= 0 && v <= 20);
+  cell.innerHTML = vals.length ? badgeHTML(Math.round(vals.reduce((a,b)=>a+b,0)/vals.length)) : '<span class="text-gray-300 text-xs">—</span>';
+}
+
+/* ── Promedio bimestral en tiempo real ────────────────────────────────── */
+function updateBimCell(studentId, courseId, newVal) {
+  // Actualiza la celda bimestral individual en el tab "Promedio Bimestral"
+  const cell = document.getElementById(`bimcell-${studentId}-${courseId}`);
+  if (cell) cell.innerHTML = badgeHTML(newVal);
+}
+function updateBimAvg(studentId, bimNum) {
+  const cell = document.getElementById(`bim-avg-${studentId}`);
+  if (cell) cell.innerHTML = badgeHTML(bimNum);
+}
+
+/* ── Guardado AJAX ─────────────────────────────────────────────────────── */
+document.querySelectorAll('.eda-input').forEach(input => {
+  let lastSaved = input.value;
+
+  const save = async function () {
+    const raw = this.value.trim();
+    if (raw === lastSaved) return;
+
+    const num = raw === '' ? null : parseInt(raw, 10);
+    if (num !== null && (num < 0 || num > 20)) {
+      showStatus('Nota fuera de rango (0-20).', false);
+      this.classList.add('border-red-400');
+      return;
+    }
+    this.classList.remove('border-red-400');
+    this.disabled = true;
+    showStatus('Guardando...');
+
+    try {
+      const res = await fetch(EDA_SAVE_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({
+          student_id:    this.dataset.student,
+          course_id:     this.dataset.course,
+          eda_id:        this.dataset.eda,
+          numeric_value: num,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        lastSaved = raw;
+        showStatus(`Guardado - ${json.qualitative}`, true);
+        // Actualiza promedio EDA de la fila
+        updateEdaAvg(this.dataset.eda, this.dataset.student);
+        // Actualiza celda bimestral individual
+        updateBimCell(this.dataset.student, this.dataset.course, json.bim_numeric);
+        // Recalcula promedio bimestral del estudiante
+        _recalcBimAvg(this.dataset.student);
+      } else {
+        showStatus(json.error || 'Error al guardar.', false);
+      }
+    } catch {
+      showStatus('Error de conexion.', false);
+    } finally {
+      this.disabled = false;
+    }
+  };
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.blur();
+      const all = Array.from(document.querySelectorAll(`.eda-input[data-eda="${this.dataset.eda}"]`));
+      const idx = all.indexOf(this);
+      if (idx + 1 < all.length) all[idx + 1].focus();
+    }
+  });
+});
+
+/* ── Guardado de comentarios AJAX ─────────────────────────────────────── */
+document.querySelectorAll('.eda-comment').forEach(textarea => {
+  let lastSaved = textarea.value;
+
+  textarea.addEventListener('blur', async function () {
+    const val = this.value.trim();
+    if (val === lastSaved.trim()) return;
+
+    showStatus('Guardando comentario...');
+    try {
+      const res = await fetch(EDA_COMMENT_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({
+          student_id: this.dataset.student,
+          eda_id:     this.dataset.eda,
+          comentario: val,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        lastSaved = val;
+        showStatus('Comentario guardado', true);
+      } else {
+        showStatus(json.error || 'Error al guardar.', false);
+      }
+    } catch {
+      showStatus('Error de conexion.', false);
+    }
+  });
+});
+
+function _recalcBimAvg(studentId) {
+  // Lee todas las celdas bimcell del estudiante y recalcula su promedio total
+  const cells = document.querySelectorAll(`[id^="bimcell-${studentId}-"]`);
+  const vals = [];
+  cells.forEach(c => {
+    const numEl = c.querySelector('div');
+    if (numEl) {
+      const n = parseInt(numEl.textContent, 10);
+      if (!isNaN(n)) vals.push(n);
+    }
+  });
+  const avg = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+  updateBimAvg(studentId, avg);
+}
+</script>
+{% endblock %}

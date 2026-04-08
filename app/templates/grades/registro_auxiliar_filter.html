@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Registro Auxiliar{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-5">
+  <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+    <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-brand">Registro Auxiliar — Selección</h1>
+    <p class="text-sm text-gray-500">Selecciona el aula, bimestre, EDA y curso para registrar notas</p>
+  </div>
+</div>
+
+{% if allowed_ids is not none %}
+<div class="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3 text-sm text-blue-800">
+  <svg class="w-5 h-5 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z"/>
+  </svg>
+  <span>Mostrando únicamente tus <strong>{{ allowed_ids|length }} curso{{ 's' if allowed_ids|length != 1 else '' }} asignado{{ 's' if allowed_ids|length != 1 else '' }}</strong>.</span>
+</div>
+{% endif %}
+
+<form method="GET" id="filter-form"
+      class="bg-white rounded-xl shadow p-6 mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  <input type="hidden" name="anio" value="{{ anio }}">
+
+  <!-- Nivel -->
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Nivel</label>
+    <select name="nivel"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      {% for n in niveles %}
+      <option value="{{ n }}" {% if n == nivel %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Grado -->
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Grado</label>
+    <select name="grado" id="sel-grado"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Grado --</option>
+      {% for g in grados %}
+      <option value="{{ g }}" {% if g == grado %}selected{% endif %}>{{ g }}°</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <input type="hidden" name="seccion" value="A">
+
+  <!-- Bimestre -->
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Bimestre</label>
+    <select name="term_id" id="sel-term"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Bimestre --</option>
+      {% for t in terms %}
+      <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.nombre }} {{ t.anio }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- EDA -->
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">EDA</label>
+    <select name="eda_id"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- EDA --</option>
+      {% for e in edas %}
+      <option value="{{ e.id }}" {% if e.id == eda_id %}selected{% endif %}>{{ e.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Curso -->
+  <div>
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Curso / Asignatura</label>
+    <select name="course_id"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Curso --</option>
+      {% for c in courses %}
+      <option value="{{ c.id }}" {% if c.id == course_id %}selected{% endif %}>
+        {{ c.nombre }} <span class="text-gray-400">({{ c.area }})</span>
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Botón -->
+  <div class="flex flex-col gap-2 items-stretch justify-end">
+    <button type="submit"
+            class="w-full bg-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-light transition flex items-center justify-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Abrir Registro
+    </button>
+    {% if grado and term_id %}
+    <a href="{{ url_for('grades.registro_auxiliar_export_zip', anio=anio, nivel=nivel, grado=grado, seccion=seccion or 'A', term_id=term_id) }}"
+       class="w-full text-center bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+      </svg>
+      Descargar ZIP (PDF por curso y EDA)
+    </a>
+    <p class="text-[11px] text-gray-500 text-center leading-tight">
+      Un PDF por cada asignatura y EDA con estudiantes en {{ grado }}° sección {{ seccion or 'A' }}.
+    </p>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Instrucciones -->
+<div class="bg-gray-50 border border-gray-200 rounded-xl p-5 text-sm text-gray-600 space-y-2">
+  <p class="font-semibold text-gray-700">¿Cómo usar el Registro Auxiliar?</p>
+  <ol class="list-decimal list-inside space-y-1 ml-2">
+    <li>Selecciona el grado y sección del aula.</li>
+    <li>Elige el bimestre y luego la EDA correspondiente.</li>
+    <li>Selecciona el curso/asignatura que deseas registrar.</li>
+    <li>Haz clic en <strong>Abrir Registro</strong> para ingresar las notas semanales.</li>
+  </ol>
+  <p class="mt-2 text-xs text-gray-400">
+    El promedio cuantitativo se calcula automáticamente:
+    <em>PROM. CUANT = redondeo((PRE-PROMEDIO + EXAMEN MENSUAL) / 2)</em>.
+    Este valor actualiza la nota EDA automáticamente.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Recarga el formulario al cambiar bimestre o grado para actualizar EDAs y cursos */
+document.getElementById('sel-term').addEventListener('change', () => document.getElementById('filter-form').submit());
+document.getElementById('sel-grado').addEventListener('change', () => document.getElementById('filter-form').submit());
+</script>
+{% endblock %}

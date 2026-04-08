@@ -1,0 +1,667 @@
+{% extends "base.html" %}
+{% block title %}Registro Auxiliar — {{ eda.nombre }}{% endblock %}
+
+{% block head %}
+<style>
+  /* Texto vertical para encabezados de columna */
+  .th-vert {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    padding: 8px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: left;
+    height: 90px;
+    vertical-align: bottom;
+  }
+  /* Tabla de registro */
+  .reg-table { border-collapse: collapse; }
+  .reg-table th, .reg-table td {
+    border: 1px solid #d1d5db;
+  }
+  .reg-table input[type=number] {
+    width: 38px; text-align: center; border: none;
+    background: transparent; font-size: 12px; padding: 2px;
+    outline: none;
+  }
+  .reg-table input[type=number]:focus { background: #eff6ff; border-radius: 3px; }
+  .reg-table input.error { background: #fee2e2 !important; }
+  /* Colores por semana */
+  .sem1-hdr { background: #dbeafe; }   /* azul claro */
+  .sem2-hdr { background: #dcfce7; }   /* verde claro */
+  .sem3-hdr { background: #fef3c7; }   /* amarillo claro */
+  .sem4-hdr { background: #fce7f3; }   /* rosa claro */
+  .sem1-bg  { background: #eff6ff; }
+  .sem2-bg  { background: #f0fdf4; }
+  .sem3-bg  { background: #fffbeb; }
+  .sem4-bg  { background: #fdf2f8; }
+  .prom-hdr { background: #f59e0b; color: #fff; }
+  .exam-hdr { background: #0e2f77; color: #fff; }
+  .cuant-hdr{ background: #fbbf24; }
+  .cual-hdr { background: #fbbf24; }
+  .prom-cell{ background: #fef9c3; font-weight: 700; font-size: 12px; }
+  .cuant-cell{ background: #fef08a; font-weight: 800; font-size: 13px; }
+  /* Escala cualitativa */
+  .badge-AD { background:#dbeafe; color:#1e40af; }
+  .badge-A  { background:#dcfce7; color:#166534; }
+  .badge-B  { background:#fef9c3; color:#854d0e; }
+  .badge-C  { background:#fee2e2; color:#991b1b; }
+  .badge-x  { color:#9ca3af; }
+  /* Sticky columns */
+  .sticky-0 { position: sticky; left: 0; z-index: 2; background: #fff; }
+  .sticky-1 { position: sticky; left: 32px; z-index: 2; background: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Encabezado del Registro -->
+<div class="bg-brand text-white rounded-xl px-5 py-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <div class="text-xs font-semibold opacity-70 uppercase tracking-wide">Registro Auxiliar</div>
+    <div class="text-xl font-bold mt-0.5">{{ eda.nombre }} — {{ term.nombre }} {{ term.anio }}</div>
+    <div class="text-sm opacity-80 mt-1">
+      <span class="font-semibold">Curso:</span> {{ course.nombre }}
+      &nbsp;|&nbsp;<span class="font-semibold">Grado:</span> {{ grado }}°
+      &nbsp;|&nbsp;<span class="font-semibold">Sección:</span> {{ seccion }}
+      &nbsp;|&nbsp;<span class="font-semibold">Área:</span> {{ course.area }}
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="{{ url_for('grades.registro_auxiliar_export_pdf', eda_id=eda.id, course_id=course.id, grado=grado, seccion=seccion) }}"
+       class="text-xs bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded hover:bg-emerald-600 transition flex items-center gap-1">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+      </svg>
+      Descargar PDF
+    </a>
+    <button onclick="document.getElementById('modal-headers').classList.remove('hidden')"
+            class="text-xs bg-amber-400 text-amber-900 font-semibold px-3 py-1.5 rounded hover:bg-amber-300 transition flex items-center gap-1">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+      </svg>
+      Personalizar columnas
+    </button>
+    <a href="{{ url_for('grades.registro_auxiliar') }}"
+       class="text-xs bg-white text-brand font-semibold px-3 py-1.5 rounded hover:bg-blue-50 transition">
+      ← Cambiar selección
+    </a>
+  </div>
+</div>
+
+{% set is_docente = current_user.has_role('DOCENTE') %}
+{% set reg_locked = (term.locked or eda.locked) and is_docente %}
+
+<!-- Banner de bloqueo -->
+{% if reg_locked %}
+<div class="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-3 flex items-center gap-3">
+  <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+  </svg>
+  <span class="text-sm text-red-800 font-medium">
+    🔒 {% if term.locked %}Bimestre bloqueado{% else %}{{ eda.nombre }} bloqueada{% endif %}. No puedes modificar notas. Contacta al administrador.
+  </span>
+</div>
+{% endif %}
+
+<!-- Estado de guardado -->
+<div id="save-status" class="text-sm h-5 mb-2 font-medium"></div>
+
+{% if students %}
+
+<!-- ═══════════════════ TABLA PRINCIPAL ═══════════════════ -->
+<div class="table-wrap bg-white rounded-xl shadow mb-5">
+<table class="reg-table text-xs w-full">
+
+  <!-- ── FILA 1: Grupos de semanas ── -->
+  <thead>
+  <tr class="text-center">
+    <th rowspan="3" class="sticky-0 text-center bg-brand text-white px-1 py-2" style="min-width:28px; left:0;">N°</th>
+    <th rowspan="3" class="sticky-1 bg-brand text-white text-left px-2 py-2 font-semibold"
+        style="min-width:160px; left:32px;">APELLIDOS Y NOMBRES</th>
+
+    <th colspan="5" class="sem1-hdr text-brand font-bold py-1 text-[11px]">SEMANA 1</th>
+    <th colspan="5" class="sem2-hdr text-green-800 font-bold py-1 text-[11px]">SEMANA 2</th>
+    <th colspan="7" class="sem3-hdr text-yellow-800 font-bold py-1 text-[11px]">SEMANA 3</th>
+    <th colspan="5" class="sem4-hdr text-pink-800 font-bold py-1 text-[11px]">SEMANA 4</th>
+
+    <th rowspan="2" class="prom-hdr text-center font-bold" style="min-width:44px;">
+      <div class="th-vert">PRE-PROMEDIO</div>
+    </th>
+    <th rowspan="2" class="exam-hdr text-center font-bold" style="min-width:44px;">
+      <div class="th-vert">EXAMEN MENSUAL</div>
+    </th>
+    <th rowspan="2" class="cuant-hdr text-brand font-bold text-center" style="min-width:48px;">
+      <div class="th-vert">PROM. CUANTITATIVO</div>
+    </th>
+    <th rowspan="2" class="cual-hdr text-brand font-bold text-center" style="min-width:44px;">
+      <div class="th-vert">PROM. CUALITATIVO</div>
+    </th>
+    <th rowspan="3" class="bg-gray-100 text-gray-600 font-bold text-center text-[9px] px-1"
+        style="min-width:70px;">ESCALA<br>ACADÉMICA</th>
+  </tr>
+
+  <!-- ── FILA 2: Ítems por semana ── -->
+  <tr class="text-center">
+    {% for sem, css in [(1,'sem1-hdr'),(2,'sem2-hdr')] %}
+    <th class="{{ css }} th-vert">{{ headers['tarea'] }} N°0{{ sem }}</th>
+    <th class="{{ css }} th-vert">{{ headers['intervencion'] }}</th>
+    <th class="{{ css }} th-vert">{{ headers['fast_test'] }}</th>
+    <th class="{{ css }} th-vert">{{ headers['aptitudinal'] }}</th>
+    <th class="{{ css }} font-bold th-vert">P</th>
+    {% endfor %}
+    <!-- Semana 3 extra -->
+    <th class="sem3-hdr th-vert">{{ headers['tarea'] }} N°03</th>
+    <th class="sem3-hdr th-vert">{{ headers['intervencion'] }}</th>
+    <th class="sem3-hdr th-vert">{{ headers['fast_test'] }}</th>
+    <th class="sem3-hdr th-vert">{{ headers['rev_cuaderno'] }}</th>
+    <th class="sem3-hdr th-vert">{{ headers['aptitudinal'] }}</th>
+    <th class="sem3-hdr th-vert">{{ headers['rev_libro'] }}</th>
+    <th class="sem3-hdr font-bold th-vert">P</th>
+    <!-- Semana 4 -->
+    <th class="sem4-hdr th-vert">{{ headers['tarea'] }} N°04</th>
+    <th class="sem4-hdr th-vert">{{ headers['intervencion'] }}</th>
+    <th class="sem4-hdr th-vert">{{ headers['fast_test'] }}</th>
+    <th class="sem4-hdr th-vert">{{ headers['aptitudinal'] }}</th>
+    <th class="sem4-hdr font-bold th-vert">P</th>
+  </tr>
+  </thead>
+
+  <!-- ── BODY ── -->
+  <tbody>
+  {% for student in students %}
+  {% set loop_idx = loop.index %}
+  {# Datos del estudiante #}
+  {% set s1 = semana_map.get((student.id, 1)) %}
+  {% set s2 = semana_map.get((student.id, 2)) %}
+  {% set s3 = semana_map.get((student.id, 3)) %}
+  {% set s4 = semana_map.get((student.id, 4)) %}
+  {% set p1 = weekly_prom.get((student.id, 1)) %}
+  {% set p2 = weekly_prom.get((student.id, 2)) %}
+  {% set p3 = weekly_prom.get((student.id, 3)) %}
+  {% set p4 = weekly_prom.get((student.id, 4)) %}
+  {% set pp = pre_prom.get(student.id) %}
+  {% set ex = examen_map.get(student.id) %}
+  {% set cuant = cuant_map.get(student.id) %}
+  {% set cual = cual_map.get(student.id, '--') %}
+
+  <tr class="hover:bg-gray-50" id="row-{{ student.id }}">
+    <!-- N° -->
+    <td class="sticky-0 text-center text-gray-500 font-medium px-1 py-1" style="left:0;">{{ loop_idx }}</td>
+
+    <!-- Nombre -->
+    <td class="sticky-1 px-2 py-1 font-semibold text-gray-800 whitespace-nowrap" style="left:32px;">
+      <span>{{ student.full_name }}</span>
+    </td>
+
+    {# ── Macro para celda de input ── #}
+    {# S1 #}
+    {% for field in ['tarea','intervencion','fast_test','aptitudinal'] %}
+    <td class="sem1-bg text-center p-0.5">
+      <input type="number" min="0" max="20"
+             class="reg-input sem1-bg"
+             value="{{ s1[field] if s1 and s1[field] is not none else '' }}"
+             data-student="{{ student.id }}"
+             data-course="{{ course.id }}"
+             data-eda="{{ eda.id }}"
+             data-semana="1"
+             data-field="{{ field }}"
+             data-prom-cell="prom-1-{{ student.id }}"
+             data-pp-cell="pp-{{ student.id }}"
+             data-cuant-cell="cuant-{{ student.id }}"
+             {% if reg_locked %}disabled title="Bloqueado"{% endif %}/>
+    </td>
+    {% endfor %}
+    <td class="prom-cell text-center" id="prom-1-{{ student.id }}">
+      {{ p1 if p1 is not none else '' }}
+    </td>
+
+    {# S2 #}
+    {% for field in ['tarea','intervencion','fast_test','aptitudinal'] %}
+    <td class="sem2-bg text-center p-0.5">
+      <input type="number" min="0" max="20"
+             class="reg-input sem2-bg"
+             value="{{ s2[field] if s2 and s2[field] is not none else '' }}"
+             data-student="{{ student.id }}"
+             data-course="{{ course.id }}"
+             data-eda="{{ eda.id }}"
+             data-semana="2"
+             data-field="{{ field }}"
+             data-prom-cell="prom-2-{{ student.id }}"
+             data-pp-cell="pp-{{ student.id }}"
+             data-cuant-cell="cuant-{{ student.id }}"
+             {% if reg_locked %}disabled title="Bloqueado"{% endif %}/>
+    </td>
+    {% endfor %}
+    <td class="prom-cell text-center" id="prom-2-{{ student.id }}">
+      {{ p2 if p2 is not none else '' }}
+    </td>
+
+    {# S3 #}
+    {% for field in ['tarea','intervencion','fast_test','rev_cuaderno','aptitudinal','rev_libro'] %}
+    <td class="sem3-bg text-center p-0.5">
+      <input type="number" min="0" max="20"
+             class="reg-input sem3-bg"
+             value="{{ s3[field] if s3 and s3[field] is not none else '' }}"
+             data-student="{{ student.id }}"
+             data-course="{{ course.id }}"
+             data-eda="{{ eda.id }}"
+             data-semana="3"
+             data-field="{{ field }}"
+             data-prom-cell="prom-3-{{ student.id }}"
+             data-pp-cell="pp-{{ student.id }}"
+             data-cuant-cell="cuant-{{ student.id }}"
+             {% if reg_locked %}disabled title="Bloqueado"{% endif %}/>
+    </td>
+    {% endfor %}
+    <td class="prom-cell text-center" id="prom-3-{{ student.id }}">
+      {{ p3 if p3 is not none else '' }}
+    </td>
+
+    {# S4 #}
+    {% for field in ['tarea','intervencion','fast_test','aptitudinal'] %}
+    <td class="sem4-bg text-center p-0.5">
+      <input type="number" min="0" max="20"
+             class="reg-input sem4-bg"
+             value="{{ s4[field] if s4 and s4[field] is not none else '' }}"
+             data-student="{{ student.id }}"
+             data-course="{{ course.id }}"
+             data-eda="{{ eda.id }}"
+             data-semana="4"
+             data-field="{{ field }}"
+             data-prom-cell="prom-4-{{ student.id }}"
+             data-pp-cell="pp-{{ student.id }}"
+             data-cuant-cell="cuant-{{ student.id }}"
+             {% if reg_locked %}disabled title="Bloqueado"{% endif %}/>
+    </td>
+    {% endfor %}
+    <td class="prom-cell text-center" id="prom-4-{{ student.id }}">
+      {{ p4 if p4 is not none else '' }}
+    </td>
+
+    <!-- PRE-PROMEDIO -->
+    <td class="prom-cell text-center text-amber-800" id="pp-{{ student.id }}">
+      {{ pp if pp is not none else '' }}
+    </td>
+
+    <!-- EXAMEN MENSUAL -->
+    <td class="bg-brand/10 text-center p-0.5">
+      <input type="number" min="0" max="20"
+             class="exam-input"
+             style="width:40px; text-align:center; border:none; background:transparent; font-size:12px; padding:2px; outline:none;"
+             value="{{ ex if ex is not none else '' }}"
+             data-student="{{ student.id }}"
+             data-course="{{ course.id }}"
+             data-eda="{{ eda.id }}"
+             data-pp-cell="pp-{{ student.id }}"
+             data-cuant-cell="cuant-{{ student.id }}"
+             {% if reg_locked %}disabled title="Bloqueado"{% endif %}/>
+    </td>
+
+    <!-- PROM. CUANTITATIVO -->
+    <td class="cuant-cell text-center text-brand" id="cuant-{{ student.id }}">
+      {{ cuant if cuant is not none else '' }}
+    </td>
+
+    <!-- PROM. CUALITATIVO -->
+    <td class="cuant-cell text-center" id="cual-{{ student.id }}">
+      {% if cual and cual != '--' %}
+      <span class="inline-block px-1.5 py-0.5 rounded font-bold text-xs badge-{{ cual }}">{{ cual }}</span>
+      {% else %}
+      <span class="text-gray-300">—</span>
+      {% endif %}
+    </td>
+
+    <!-- ESCALA ACADÉMICA -->
+    <td class="text-center px-1 py-1" id="escala-{{ student.id }}">
+      {% if cuant is not none %}
+        {% if course.nivel == 'INICIAL' %}
+          {% if cuant >= 14 %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">LOGRO PREVISTO</span>
+          {% elif cuant >= 11 %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800">EN PROCESO</span>
+          {% else %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">EN INICIO</span>
+          {% endif %}
+        {% else %}
+          {% if cuant >= 18 %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">LOGRO DESTACADO</span>
+          {% elif cuant >= 14 %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">LOGRO PROGRESIVO</span>
+          {% elif cuant >= 11 %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800">EN PROCESO</span>
+          {% else %}
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">EN INICIO</span>
+          {% endif %}
+        {% endif %}
+      {% else %}
+        <span class="text-gray-300 text-[10px]">—</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<!-- ═══════════════════ RESUMEN ═══════════════════ -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+  <!-- Estadísticas -->
+  <div class="bg-white rounded-xl shadow p-4">
+    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Resumen — {{ eda.nombre }}</h3>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="bg-green-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-green-700">{{ summary.aprobados }}</div>
+        <div class="text-xs text-green-600 font-medium">Aprobados (≥11)</div>
+      </div>
+      <div class="bg-red-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-red-700">{{ summary.desaprobados }}</div>
+        <div class="text-xs text-red-600 font-medium">Desaprobados (&lt;11)</div>
+      </div>
+      <div class="bg-blue-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-brand">{{ summary.total }}</div>
+        <div class="text-xs text-blue-600 font-medium">Total de alumnos</div>
+      </div>
+      <div class="bg-amber-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-amber-700">
+          {{ summary.prom_asig if summary.prom_asig is not none else '—' }}
+        </div>
+        <div class="text-xs text-amber-600 font-medium">Promedio asignatura</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leyenda de escala -->
+  <div class="bg-white rounded-xl shadow p-4">
+    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Escala de Calificación</h3>
+    <div class="space-y-2">
+      <div class="flex items-center gap-3">
+        <span class="inline-block w-8 text-center px-1 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">AD</span>
+        <span class="text-sm font-semibold text-gray-700">18 – 20</span>
+        <span class="text-xs text-gray-500">Logro Destacado</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="inline-block w-8 text-center px-1 py-0.5 rounded text-xs font-bold bg-green-100 text-green-800">A</span>
+        <span class="text-sm font-semibold text-gray-700">15 – 17</span>
+        <span class="text-xs text-gray-500">Logro Previsto</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="inline-block w-8 text-center px-1 py-0.5 rounded text-xs font-bold bg-yellow-100 text-yellow-800">B</span>
+        <span class="text-sm font-semibold text-gray-700">11 – 14</span>
+        <span class="text-xs text-gray-500">En Proceso</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="inline-block w-8 text-center px-1 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800">C</span>
+        <span class="text-sm font-semibold text-gray-700">0 – 10</span>
+        <span class="text-xs text-gray-500">En Inicio</span>
+      </div>
+    </div>
+    <p class="text-[10px] text-gray-400 mt-3">
+      PROM. CUANT = redondeo((PRE-PROM + EXAMEN) / 2).
+      Al guardar se actualiza la nota EDA automáticamente.
+    </p>
+  </div>
+</div>
+
+{% else %}
+<div class="bg-yellow-50 border border-yellow-300 rounded-xl p-5 text-yellow-800 text-sm">
+  No hay estudiantes activos en el grado <strong>{{ grado }}°</strong> sección <strong>{{ seccion }}</strong>.
+</div>
+{% endif %}
+
+<!-- ═══════════════════ MODAL PERSONALIZAR COLUMNAS ═══════════════════ -->
+<div id="modal-headers" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+    <div class="bg-brand text-white px-5 py-4 flex items-center justify-between">
+      <h3 class="font-bold text-sm">Personalizar columnas del Registro</h3>
+      <button onclick="document.getElementById('modal-headers').classList.add('hidden')"
+              class="text-white/70 hover:text-white text-lg leading-none">&times;</button>
+    </div>
+    <div class="px-5 py-4 space-y-3">
+      <p class="text-xs text-gray-500 mb-2">Renombra los encabezados de las columnas de evaluación para este curso. Deja vacío para usar el nombre por defecto.</p>
+      {% for field in ['tarea', 'intervencion', 'fast_test', 'aptitudinal', 'rev_cuaderno', 'rev_libro'] %}
+      <div class="flex items-center gap-3">
+        <label class="text-xs font-semibold text-gray-500 w-28 shrink-0 text-right">{{ default_headers.get(field, field) }}</label>
+        <input type="text" id="hdr-{{ field }}" maxlength="50"
+               value="{{ headers.get(field, '') }}"
+               placeholder="{{ default_headers.get(field, field) }}"
+               class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand focus:outline-none"/>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="px-5 py-3 bg-gray-50 flex justify-end gap-2 border-t">
+      <button onclick="resetHeaders()"
+              class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition">
+        Restaurar por defecto
+      </button>
+      <button onclick="saveHeaders()"
+              class="text-xs font-semibold px-4 py-1.5 rounded-lg bg-brand text-white hover:bg-brand-light transition">
+        Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SAVE_ITEM_URL    = "{{ url_for('grades.save_registro_item') }}";
+const SAVE_EXAM_URL    = "{{ url_for('grades.save_registro_examen') }}";
+const SAVE_HEADERS_URL = "{{ url_for('grades.save_registro_headers') }}";
+const COURSE_ID        = {{ course.id }};
+const CSRF_TOKEN       = "{{ csrf_token() }}";
+const HDR_FIELDS       = ['tarea', 'intervencion', 'fast_test', 'aptitudinal', 'rev_cuaderno', 'rev_libro'];
+const DEFAULT_HDRS     = {{ default_headers | tojson }};
+
+/* ─── Personalización de columnas ───────────────────────────────── */
+function resetHeaders() {
+  HDR_FIELDS.forEach(f => {
+    const el = document.getElementById('hdr-' + f);
+    if (el) el.value = DEFAULT_HDRS[f];
+  });
+}
+
+async function saveHeaders() {
+  const headers = {};
+  HDR_FIELDS.forEach(f => {
+    const el = document.getElementById('hdr-' + f);
+    if (el) headers[f] = el.value.trim() || DEFAULT_HDRS[f];
+  });
+  try {
+    const res = await fetch(SAVE_HEADERS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ course_id: COURSE_ID, headers }),
+    });
+    const json = await res.json();
+    if (json.ok) {
+      document.getElementById('modal-headers').classList.add('hidden');
+      location.reload();
+    } else {
+      alert(json.error || 'Error al guardar.');
+    }
+  } catch {
+    alert('Error de conexión.');
+  }
+}
+
+/* ─── Helpers ────────────────────────────────────────────────────── */
+function showStatus(msg, ok = true) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `text-sm h-5 font-medium ${ok ? 'text-green-600' : 'text-red-600'}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
+const NIVEL_CURSO = '{{ course.nivel }}';
+
+function toQual(n) {
+  if (n === null || n === undefined || n === '') return '--';
+  if (NIVEL_CURSO === 'INICIAL') {
+    if (n >= 14) return 'A';
+    if (n >= 11) return 'B';
+    return 'C';
+  }
+  if (n >= 18) return 'AD';
+  if (n >= 14) return 'A';
+  if (n >= 11) return 'B';
+  return 'C';
+}
+
+function escalaTexto(n) {
+  if (n === null || n === undefined || n === '') return '<span class="text-gray-300 text-[10px]">—</span>';
+  let cls, txt;
+  if (NIVEL_CURSO === 'INICIAL') {
+    cls = n >= 14 ? 'bg-green-100 text-green-800'
+        : n >= 11 ? 'bg-yellow-100 text-yellow-800'
+        : 'bg-red-100 text-red-800';
+    txt = n >= 14 ? 'LOGRO PREVISTO'
+        : n >= 11 ? 'EN PROCESO' : 'EN INICIO';
+  } else {
+    cls = n >= 18 ? 'bg-blue-100 text-blue-800'
+        : n >= 14 ? 'bg-green-100 text-green-800'
+        : n >= 11 ? 'bg-yellow-100 text-yellow-800'
+        : 'bg-red-100 text-red-800';
+    txt = n >= 18 ? 'LOGRO DESTACADO'
+        : n >= 14 ? 'LOGRO PROGRESIVO'
+        : n >= 11 ? 'EN PROCESO' : 'EN INICIO';
+  }
+  return `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold ${cls}">${txt}</span>`;
+}
+
+function badgeCual(cual) {
+  if (!cual || cual === '--') return '<span class="text-gray-300">—</span>';
+  const cls = cual === 'AD' ? 'badge-AD' : cual === 'A' ? 'badge-A' : cual === 'B' ? 'badge-B' : 'badge-C';
+  return `<span class="inline-block px-1.5 py-0.5 rounded font-bold text-xs ${cls}">${cual}</span>`;
+}
+
+/* ─── Actualizar celdas calculadas tras guardar ──────────────────── */
+function updateFromResult(studentId, result) {
+  // Promedios semanales
+  if (result.weekly_proms) {
+    for (const [sem, val] of Object.entries(result.weekly_proms)) {
+      const cell = document.getElementById(`prom-${sem}-${studentId}`);
+      if (cell) cell.textContent = (val !== null && val !== undefined) ? val : '';
+    }
+  }
+  // Pre-promedio
+  const ppCell = document.getElementById(`pp-${studentId}`);
+  if (ppCell) ppCell.textContent = (result.pre_prom !== null && result.pre_prom !== undefined) ? result.pre_prom : '';
+
+  // Cuant
+  const cuantCell = document.getElementById(`cuant-${studentId}`);
+  if (cuantCell) cuantCell.textContent = (result.cuant !== null && result.cuant !== undefined) ? result.cuant : '';
+
+  // Cual
+  const cualCell = document.getElementById(`cual-${studentId}`);
+  if (cualCell) cualCell.innerHTML = badgeCual(result.cual);
+
+  // Escala
+  const escalaCell = document.getElementById(`escala-${studentId}`);
+  if (escalaCell) escalaCell.innerHTML = escalaTexto(result.cuant);
+}
+
+/* ─── Guardado de ítems semanales ───────────────────────────────── */
+document.querySelectorAll('.reg-input').forEach(input => {
+  let lastSaved = input.value;
+
+  const save = async function () {
+    const raw = this.value.trim();
+    if (raw === lastSaved) return;
+
+    const num = raw === '' ? null : parseInt(raw, 10);
+    if (num !== null && (isNaN(num) || num < 0 || num > 20)) {
+      showStatus('Nota fuera de rango (0–20).', false);
+      this.classList.add('error');
+      return;
+    }
+    this.classList.remove('error');
+    showStatus('Guardando…');
+
+    try {
+      const res = await fetch(SAVE_ITEM_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({
+          student_id: this.dataset.student,
+          course_id:  this.dataset.course,
+          eda_id:     this.dataset.eda,
+          semana:     this.dataset.semana,
+          field:      this.dataset.field,
+          value:      num,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        lastSaved = raw;
+        showStatus('Guardado ✓', true);
+        updateFromResult(this.dataset.student, json);
+      } else {
+        showStatus(json.error || 'Error al guardar.', false);
+      }
+    } catch {
+      showStatus('Error de conexión.', false);
+    }
+  };
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+  });
+});
+
+/* ─── Guardado del examen mensual ──────────────────────────────── */
+document.querySelectorAll('.exam-input').forEach(input => {
+  let lastSaved = input.value;
+
+  const save = async function () {
+    const raw = this.value.trim();
+    if (raw === lastSaved) return;
+
+    const num = raw === '' ? null : parseInt(raw, 10);
+    if (num !== null && (isNaN(num) || num < 0 || num > 20)) {
+      showStatus('Nota fuera de rango (0–20).', false);
+      this.style.background = '#fee2e2';
+      return;
+    }
+    this.style.background = '';
+    showStatus('Guardando…');
+
+    try {
+      const res = await fetch(SAVE_EXAM_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({
+          student_id: this.dataset.student,
+          course_id:  this.dataset.course,
+          eda_id:     this.dataset.eda,
+          value:      num,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        lastSaved = raw;
+        showStatus('Examen guardado ✓', true);
+        updateFromResult(this.dataset.student, json);
+      } else {
+        showStatus(json.error || 'Error al guardar.', false);
+      }
+    } catch {
+      showStatus('Error de conexión.', false);
+    }
+  };
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+  });
+});
+</script>
+{% endblock %}

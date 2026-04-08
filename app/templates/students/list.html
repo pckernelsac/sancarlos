@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Estudiantes{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+  <div class="flex items-center gap-3">
+    <div class="bg-brand/10 rounded-xl p-2.5">
+      <svg class="w-7 h-7 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold text-brand">Estudiantes</h1>
+      <p class="text-sm text-gray-500">Gesti&oacute;n del padr&oacute;n estudiantil</p>
+    </div>
+  </div>
+  {% if current_user.has_role('ADMIN','AUXILIAR') %}
+  <div class="flex gap-2 flex-wrap">
+    <a href="{{ url_for('students.upload_excel') }}"
+       class="inline-flex items-center gap-2 border-2 border-brand text-brand px-4 py-2 rounded-lg font-semibold hover:bg-brand hover:text-white transition text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      Carga Excel
+    </a>
+    <a href="{{ url_for('students.new_student') }}"
+       class="inline-flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-brand-light transition text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+      </svg>
+      Nuevo Estudiante
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Filtros + búsqueda en tiempo real -->
+<div class="bg-white rounded-xl shadow p-4 mb-5">
+  <form method="GET" class="flex flex-wrap gap-3 items-end">
+    <!-- Búsqueda live -->
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Buscar</label>
+      <div class="relative">
+        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input type="text" id="search-input" placeholder="Nombre, apellido o c&oacute;digo..."
+               class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"/>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Nivel</label>
+      <select name="nivel" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+        <option value="">Todos</option>
+        {% for n in niveles %}
+        <option value="{{ n }}" {% if filtros.nivel == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Grado</label>
+      <select name="grado" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+        <option value="">Todos</option>
+        {% for g in grados %}
+        <option value="{{ g }}" {% if filtros.grado == g %}selected{% endif %}>{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Estado</label>
+      <select name="estado" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+        <option value="">Todos</option>
+        {% for e in estados %}
+        <option value="{{ e }}" {% if filtros.estado == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit"
+            class="inline-flex items-center gap-2 bg-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-light transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+      </svg>
+      Filtrar
+    </button>
+  </form>
+</div>
+
+<!-- Tabla -->
+<div class="bg-white rounded-xl shadow table-wrap">
+  <table class="w-full text-sm" id="students-table">
+    <thead class="bg-brand text-white text-xs uppercase tracking-wide">
+      <tr>
+        <th class="px-4 py-3 text-left">Código</th>
+        <th class="px-4 py-3 text-left">Apellidos y Nombres</th>
+        <th class="px-4 py-3 text-center">Nivel</th>
+        <th class="px-4 py-3 text-center">Grado</th>
+        <th class="px-4 py-3 text-center">Sección</th>
+        <th class="px-4 py-3 text-center">Estado</th>
+        <th class="px-4 py-3 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="students-body">
+      {% for s in students %}
+      <tr class="border-b hover:bg-gray-50 transition student-row"
+          data-search="{{ (s.apellido_paterno ~ ' ' ~ s.apellido_materno ~ ' ' ~ s.nombres ~ ' ' ~ s.codigo) | lower }}">
+        <td class="px-4 py-3 font-mono text-gray-500 text-xs">{{ s.codigo }}</td>
+        <td class="px-4 py-3 font-semibold text-gray-800">{{ s.full_name }}</td>
+        <td class="px-4 py-3 text-center">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
+            {% if s.nivel == 'INICIAL' %}bg-green-100 text-green-700
+            {% elif s.nivel == 'SECUNDARIA' %}bg-purple-100 text-purple-700
+            {% else %}bg-blue-100 text-blue-700{% endif %}">
+            {% if s.nivel == 'INICIAL' %}
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {% elif s.nivel == 'PRIMARIA' %}
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            {% else %}
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            {% endif %}
+            {{ s.nivel }}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-center">{{ s.grado }}</td>
+        <td class="px-4 py-3 text-center">{{ s.seccion }}</td>
+        <td class="px-4 py-3 text-center">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
+            {% if s.estado == 'ACTIVO' %}bg-green-100 text-green-700
+            {% elif s.estado == 'RETIRADO' %}bg-red-100 text-red-700
+            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+            {% if s.estado == 'ACTIVO' %}
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {% elif s.estado == 'RETIRADO' %}
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {% else %}
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {% endif %}
+            {{ s.estado }}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <div class="flex justify-center items-center gap-1.5">
+            {% if current_user.has_role('ADMIN', 'DOCENTE') %}
+            <a href="{{ url_for('grades.student_grades', token=s.id|mask_id) }}"
+               class="group/btn relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-200 hover:shadow-md">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+              </svg>
+              <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none">
+                Ver notas
+              </span>
+            </a>
+            {% endif %}
+            {% if current_user.has_role('ADMIN','AUXILIAR') %}
+            <a href="{{ url_for('students.edit_student', token=s.id|mask_id) }}"
+               class="group/btn relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition-all duration-200 hover:shadow-md">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+              </svg>
+              <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none">
+                Editar
+              </span>
+            </a>
+            {% endif %}
+            {% if current_user.has_role('ADMIN') %}
+            <a href="{{ url_for('reports.boleta_inicial_pdf' if s.nivel == 'INICIAL' else ('reports.boleta_secundaria_pdf' if s.nivel == 'SECUNDARIA' else 'reports.boleta_pdf'), token=s.id|mask_id) }}" target="_blank"
+               class="group/btn relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-200 hover:shadow-md">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none">
+                Boleta PDF
+              </span>
+            </a>
+            <form method="POST" action="{{ url_for('students.delete_student_view', token=s.id|mask_id) }}"
+                  class="inline"
+                  onsubmit="return confirm('¿Eliminar a {{ s.full_name }}? Esta acción no se puede deshacer.')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit"
+                      class="group/btn relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all duration-200 hover:shadow-md cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none">
+                  Eliminar
+                </span>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <p class="text-sm text-gray-400">No se encontraron estudiantes.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="flex items-center gap-1.5 mt-2">
+  <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+  </svg>
+  <p class="text-xs text-gray-400">Total: {{ students | length }} estudiantes</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Búsqueda en tiempo real sin llamadas al servidor
+  document.getElementById('search-input').addEventListener('input', function () {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.student-row').forEach(row => {
+      row.style.display = (q === '' || row.dataset.search.includes(q)) ? '' : 'none';
+    });
+  });
+</script>
+{% endblock %}

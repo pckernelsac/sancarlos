@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Boleta Inicial — {{ student.full_name }}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 8.5pt;
+  color: #000;
+  background: #fff;
+}
+@page { size: A4 portrait; margin: 1cm 0.8cm; }
+
+.no-break { page-break-inside: avoid; }
+.center   { text-align: center; }
+.bold     { font-weight: bold; }
+.italic   { font-style: italic; }
+
+/* ── Encabezado ── */
+.hdr-table { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+.hdr-logo-cell { width: 75pt; vertical-align: middle; text-align: center; }
+.hdr-title-cell { vertical-align: middle; text-align: center; }
+.hdr-title-cell h1 { font-size: 14pt; color: #0e2f77; font-weight: bold; letter-spacing: 1px; }
+.hdr-title-cell h2 { font-size: 16pt; color: #0e2f77; font-weight: bold; font-style: italic; }
+.hdr-title-cell .motto { font-size: 8.5pt; font-style: italic; color: #333; margin-top: 2pt; }
+.hdr-right-cell { width: 85pt; vertical-align: top; text-align: right; font-size: 7pt; color: #555; }
+
+.motto-top { text-align: center; font-size: 7.5pt; font-style: italic; color: #333; margin-bottom: 4pt; }
+
+/* ── Info alumno ── */
+.info-title {
+  background: #0e2f77; color: #fff;
+  font-weight: bold; font-size: 9.5pt;
+  text-align: center; padding: 4pt;
+  letter-spacing: 1px; margin-bottom: 3pt;
+}
+.info-table { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+.info-table td { border: 1pt solid #000; padding: 3pt 5pt; vertical-align: middle; }
+.info-label { background: #d6e4f0; font-weight: bold; width: 130pt; font-size: 8pt; }
+.info-value { font-weight: bold; font-size: 8.5pt; }
+
+/* ── Tabla principal ── */
+.main-table { width: 100%; border-collapse: collapse; font-size: 7pt; margin-bottom: 4pt; }
+.main-table th, .main-table td {
+  border: 0.5pt solid #000;
+  padding: 1.5pt 2pt;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1.2;
+}
+.th-main { background: #0e2f77; color: #fff; font-weight: bold; font-size: 6.5pt; }
+.th-bim  { background: #4472c4; color: #fff; font-weight: bold; font-size: 6.5pt; }
+.th-sub  { background: #8db4e2; color: #000; font-weight: bold; font-size: 6pt; }
+.td-area { background: #d6e4f0; font-weight: bold; font-size: 6.5pt; }
+.td-course { text-align: left; padding-left: 4pt; font-size: 6.5pt; }
+.td-prom { background: #dce6f1; font-weight: bold; font-size: 9.5pt; }
+.td-merit { background: #0e2f77; color: #fff; font-weight: bold; font-size: 6.5pt; }
+
+/* badges cualitativos */
+.q-AD { background: #dbeafe; color: #1e40af; font-weight: bold; font-size: 9.5pt; }
+.q-A  { background: #dcfce7; color: #166534; font-weight: bold; font-size: 9.5pt; }
+.q-B  { background: #fef9c3; color: #713f12; font-weight: bold; font-size: 9.5pt; }
+.q-C  { background: #fee2e2; color: #991b1b; font-weight: bold; font-size: 9.5pt; }
+.q-NA { color: #999; }
+
+/* ── Sección inferior ── */
+.bottom-outer { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+.bottom-outer td { vertical-align: top; padding: 0; }
+
+.scale-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+.scale-table th { background: #0e2f77; color: #fff; font-weight: bold; padding: 3pt 4pt; font-size: 7pt; }
+.scale-table td { border: 0.5pt solid #aaa; padding: 2pt 4pt; }
+.scale-code { font-weight: bold; text-align: center; width: 22pt; }
+
+.att-table { width: 100%; border-collapse: collapse; font-size: 6.5pt; }
+.att-table th { background: #0e2f77; color: #fff; font-weight: bold; padding: 2pt 2pt; font-size: 6pt; text-align: center; }
+.att-table td { border: 0.5pt solid #aaa; padding: 2pt 2pt; text-align: center; }
+.att-label { text-align: left; font-weight: bold; padding-left: 3pt; }
+
+.promo-box {
+  border: 2pt solid #0e2f77;
+  width: 68pt; height: 68pt;
+  text-align: center; vertical-align: middle;
+  font-size: 8pt; font-weight: bold;
+  color: #0e2f77; font-style: italic;
+  padding-top: 24pt;
+}
+
+/* ── Conducta ── */
+.cond-title { background: #1a4499; color: #fff; font-weight: bold; font-size: 6pt; text-align: center; padding: 2pt; }
+.cond-table { width: 100%; border-collapse: collapse; font-size: 5.5pt; margin-bottom: 2pt; }
+.cond-table th { background: #0e2f77; color: #fff; font-weight: bold; padding: 1.5pt 2pt; font-size: 5.5pt; text-align: center; border: 0.5pt solid #000; }
+.cond-table td { border: 0.5pt solid #aaa; padding: 1.5pt 2pt; text-align: center; }
+.cond-ind { text-align: left; font-weight: bold; font-size: 6pt; color: #0e2f77; background: #d6e4f0; padding: 2pt 4pt; width: 100pt; }
+
+/* ── PPFF ── */
+.ppff-table { width: 100%; border-collapse: collapse; font-size: 5.5pt; margin-bottom: 2pt; }
+.ppff-table th { background: #0e2f77; color: #fff; font-weight: bold; padding: 1.5pt 3pt; font-size: 6pt; text-align: center; border: 0.5pt solid #000; }
+.ppff-table td { border: 0.5pt solid #aaa; padding: 1.5pt 3pt; }
+.ppff-desc { text-align: right; font-style: italic; padding-right: 5pt; width: 155pt; }
+
+/* ── Comentarios ── */
+.comm-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; margin-bottom: 4pt; }
+.comm-table th { background: #0e2f77; color: #fff; font-weight: bold; padding: 3pt 6pt; font-size: 7.5pt; text-align: center; border: 0.5pt solid #000; }
+.comm-table td { border: 0.5pt solid #aaa; padding: 3pt 5pt; }
+.comm-label { background: #d6e4f0; font-weight: bold; width: 100pt; font-style: italic; font-size: 7pt; }
+.comm-text  { font-style: italic; font-size: 7pt; }
+
+/* ── Firmas ── */
+.sig-table { width: 100%; border-collapse: collapse; margin-top: 14pt; }
+.sig-table td { text-align: center; width: 33%; padding-top: 30pt; border-top: 0.5pt solid #333; font-size: 7.5pt; }
+.sig-name { font-weight: bold; }
+.sig-role { font-size: 7pt; font-weight: bold; text-transform: uppercase; color: #0e2f77; }
+
+/* ── Footer ── */
+.footer-table { width: 100%; border-collapse: collapse; margin-top: 6pt; border-top: 0.5pt solid #aaa; }
+.footer-table td { font-size: 6.5pt; color: #555; vertical-align: top; padding-top: 3pt; }
+</style>
+</head>
+<body>
+
+<!-- LEMA ANUAL -->
+<div class="motto-top">"Año de la recuperación y consolidación de la economía peruana"</div>
+
+<!-- ENCABEZADO -->
+<table class="hdr-table" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="hdr-logo-cell">
+      <table style="width:62pt;height:62pt;border:3pt solid #0e2f77;" cellpadding="0" cellspacing="0">
+        <tr><td style="text-align:center;vertical-align:middle;font-size:11pt;font-weight:bold;color:#0e2f77;">SC</td></tr>
+      </table>
+    </td>
+    <td class="hdr-title-cell">
+      <h1>INSTITUCIÓN EDUCATIVA</h1>
+      <h2>"San Carlos"</h2>
+      <div class="motto italic">"Nuestra Misión, … Tu Éxito…!"</div>
+    </td>
+    <td class="hdr-right-cell">
+      Av. San Carlos 406<br/>Huancayo<br/>Telf: 064-233700<br/>Cel. 934815213
+    </td>
+  </tr>
+</table>
+
+<!-- TÍTULO INFORME -->
+{% set grado_map = {'3': '3 AÑOS', '4': '4 AÑOS', '5': '5 AÑOS'} %}
+<div class="info-title">INFORME ACADÉMICO: {{ grado_map.get(student.grado, student.grado ~ ' AÑOS') }} DE INICIAL</div>
+
+<!-- DATOS DEL ALUMNO -->
+<table class="info-table" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="info-label">PERIODO DE INFORME :</td>
+    <td class="info-value" colspan="3">AÑO LECTIVO {{ anio }}</td>
+  </tr>
+  <tr>
+    <td class="info-label">CÓDIGO DEL ALUMNO :</td>
+    <td class="info-value" style="width:140pt">{{ student.codigo }}</td>
+    <td class="info-label" style="width:60pt">DNI :</td>
+    <td class="info-value">{{ student.dni or '—' }}</td>
+  </tr>
+  <tr>
+    <td class="info-label">NOMBRE DEL ALUMNO :</td>
+    <td class="info-value bold" colspan="3">{{ student.full_name | upper }}</td>
+  </tr>
+</table>
+
+<!-- ══ TABLA PRINCIPAL DE NOTAS ══ -->
+<div class="no-break">
+<table class="main-table" cellpadding="0" cellspacing="0">
+  <colgroup>
+    <col style="width:30pt"/><!-- ÁREAS -->
+    <col style="width:85pt"/><!-- ASIGNATURAS -->
+    {% for term in terms %}
+    <col style="width:18pt"/><!-- P1/P3/P5/P7 -->
+    <col style="width:18pt"/><!-- P2/P4/P6/P8 -->
+    <col style="width:22pt"/><!-- PROM -->
+    <col style="width:16pt"/><!-- Letra -->
+    {% endfor %}
+    <col style="width:24pt"/><!-- NIVEL DE LOGRO -->
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="th-main" rowspan="2">ÁREAS</th>
+      <th class="th-main" rowspan="2" style="text-align:left;padding-left:3pt">ASIGNATURAS</th>
+      {% for term in terms %}
+      <th class="th-bim" colspan="4">{{ term.nombre|upper }}</th>
+      {% endfor %}
+      <th class="th-main" rowspan="2">NIVEL DE LOGRO</th>
+    </tr>
+    <tr>
+      {% for term in terms %}
+      {% set base = (loop.index0 * 2) + 1 %}
+      <th class="th-sub">P{{ base }}</th>
+      <th class="th-sub">P{{ base + 1 }}</th>
+      <th class="th-sub">PROM</th>
+      <th class="th-sub"></th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% set ns = namespace(current_area='') %}
+    {% for course_id, data in matrix.items() %}
+      {% set course = data.course %}
+      {% if course.area != ns.current_area %}
+        {% set ns.current_area = course.area %}
+        <tr>
+          <td class="td-area bold" colspan="{{ 2 + terms|length * 4 + 1 }}">
+            {{ course.area | upper }}
+          </td>
+        </tr>
+      {% endif %}
+      <tr>
+        <td class="td-area" style="background:#eef4fb"></td>
+        <td class="td-course">{{ course.nombre }}</td>
+        {% for term in terms %}
+          {% set p1 = eda_data.get(term.id, {}).get(1, {}).get(course_id) %}
+          <td>{{ p1 if p1 is not none else '-' }}</td>
+          {% set p2 = eda_data.get(term.id, {}).get(2, {}).get(course_id) %}
+          <td>{{ p2 if p2 is not none else '-' }}</td>
+          {% set g = data.terms.get(term.id) %}
+          {% if g and g.numeric_value is not none %}
+            <td class="td-prom">{{ g.numeric_value }}</td>
+            <td class="q-{{ g.qualitative_grade }}">{{ g.qualitative_grade }}</td>
+          {% else %}
+            <td class="td-prom q-NA">-</td>
+            <td class="q-NA">-</td>
+          {% endif %}
+        {% endfor %}
+        {% if data.promedio_cual and data.promedio_cual != '--' %}
+          <td class="q-{{ data.promedio_cual }}">{{ data.promedio_cual }}</td>
+        {% else %}
+          <td class="q-NA">-</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+
+    <!-- Orden de Mérito -->
+    <tr>
+      <td class="td-merit" colspan="2">Orden de Mérito</td>
+      {% set bim_labels = ['IB','IIB','IIIB','IVB'] %}
+      {% for term in terms %}
+      <td colspan="3" class="td-merit">{{ bim_labels[loop.index0] }}</td>
+      {% set r = merit_per_term.get(term.id) %}
+      <td class="td-merit">{{ r ~ '°' if r else '-' }}</td>
+      {% endfor %}
+      <td class="td-merit">
+        {% if merit_final %}{{ merit_final }}°{% else %}-{% endif %}
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ══ ESCALA + ASISTENCIA + PROMOVIDO ══ -->
+<div class="no-break">
+<table class="bottom-outer" cellpadding="0" cellspacing="4">
+  <tr>
+    <td style="width:155pt; vertical-align:top">
+      <table class="scale-table" cellpadding="0" cellspacing="0">
+        <tr><th colspan="3">ESCALA DE VALORES</th></tr>
+        <tr><td>DE 14 A 20</td><td>LOGRO PREVISTO</td> <td class="scale-code q-A">A</td></tr>
+        <tr><td>DE 11 A 13</td><td>EN PROCESO</td>      <td class="scale-code q-B">B</td></tr>
+        <tr><td>DE 00 A 10</td><td>EN INICIO</td>       <td class="scale-code q-C">C</td></tr>
+      </table>
+    </td>
+
+    <td style="vertical-align:top; padding-left:3pt">
+      <table class="att-table" cellpadding="0" cellspacing="0">
+        <tr>
+          <th class="att-label">Meses</th>
+          {% for m in meses %}<th>{{ m[0] }}</th>{% endfor %}
+          <th>TOTAL</th>
+        </tr>
+        <tr>
+          <td class="att-label">FALTAS</td>
+          {% for m in meses %}
+            {% set a = att_by_month.get(m) %}
+            <td>{{ '%02d' % a.faltas if a else '00' }}</td>
+          {% endfor %}
+          <td><strong>{{ '%02d' % total_faltas }}</strong></td>
+        </tr>
+        <tr>
+          <td class="att-label">TARDANZAS</td>
+          {% for m in meses %}
+            {% set a = att_by_month.get(m) %}
+            <td>{{ '%02d' % a.tardanzas if a else '00' }}</td>
+          {% endfor %}
+          <td><strong>{{ '%02d' % total_tardanzas }}</strong></td>
+        </tr>
+      </table>
+    </td>
+
+    <!-- Situación final (sin recuadro) -->
+    <td style="width:76pt; text-align:center; vertical-align:middle; font-size:7.5pt; font-weight:bold; color:#0e2f77; font-style:italic;">
+      {% if promedio_anual is not none and promedio_anual >= 11 %}
+        Promovido
+      {% elif promedio_anual is not none %}
+        No Promovido
+      {% else %}
+        En Proceso
+      {% endif %}
+    </td>
+  </tr>
+</table>
+</div>
+
+<!-- ══ CONDUCTA ══ -->
+<div class="no-break">
+<table class="cond-table" cellpadding="0" cellspacing="0">
+  <thead>
+    <tr>
+      <th colspan="{{ 3 + meses|length }}" style="background:#1a4499;font-size:6pt;padding:2pt">
+        EVALUACIÓN DEL COMPORTAMIENTO DEL ALUMNO(A)
+      </th>
+    </tr>
+    <tr>
+      <th style="width:110pt;text-align:right">Indicador</th>
+      <th style="width:8pt"></th>
+      {% for m in meses %}<th>{{ m[0] }}</th>{% endfor %}
+      <th style="width:22pt">PROM.</th>
+      <th style="width:16pt"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ind in indicadores %}
+    {% set b = behavior.get(ind) %}
+    <tr>
+      <td class="cond-ind">{{ ind }}</td>
+      <td></td>
+      {% for m in meses %}<td>-</td>{% endfor %}
+      {% if b and b.qualitative_grade %}
+        {% set q = b.qualitative_grade %}
+        <td class="td-prom">-</td>
+        <td class="q-{{ q }}">{{ q }}</td>
+      {% else %}
+        <td class="q-NA">-</td>
+        <td class="q-NA">-</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<!-- ══ RESPONSABILIDAD PPFF ══ -->
+{% set ppff_map = {'Reuniones': 'Asiste a las reuniones del plantel.', 'Colabora': 'Es responsable con su hijo(a).', 'Normas': 'Respeta el Reglamento Interno.'} %}
+<div class="no-break">
+<table class="ppff-table" cellpadding="0" cellspacing="0">
+  <thead>
+    <tr>
+      <th colspan="{{ 3 + terms|length }}" style="background:#1a4499;font-size:6pt;padding:2pt">
+        EVALUACIÓN DE RESPONSABILIDAD DEL PPFF O APODERADO
+      </th>
+    </tr>
+    <tr>
+      <th style="width:155pt;text-align:right">Criterio</th>
+      {% set bim_labels = ['I BIM','II BIM','III BIM','IV BIM'] %}
+      {% for term in terms %}
+      <th>{{ bim_labels[loop.index0] }}</th>
+      {% endfor %}
+      <th style="width:30pt">PROM.</th>
+      <th style="width:16pt"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ind in indicadores_ppff %}
+    {% set desc = ppff_map.get(ind, ind) %}
+    <tr>
+      <td class="ppff-desc italic">{{ desc }}</td>
+      {% for term in terms %}
+        {% set p = ppff_by_term.get(term.id, {}).get(ind) %}
+        {% if p and p.calificacion is not none %}
+          <td>{{ p.calificacion }}</td>
+        {% else %}
+          <td>-</td>
+        {% endif %}
+      {% endfor %}
+      {% set iavg = ppff_ind_avgs.get(ind, {}) %}
+      {% if iavg.promedio_num is not none %}
+        <td class="td-prom">{{ iavg.promedio_num }}</td>
+        <td class="q-{{ iavg.promedio_cual }}">{{ iavg.promedio_cual }}</td>
+      {% else %}
+        <td>-</td>
+        <td class="q-NA">-</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<!-- ══ COMENTARIOS ══ -->
+{% if terms %}
+<div class="no-break">
+<table class="comm-table" cellpadding="0" cellspacing="0">
+  <thead>
+    <tr>
+      <th colspan="2">RECOMENDACIONES DE PARTE DEL TUTOR(A) EN CADA BIMESTRE</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for term in terms %}
+    <tr>
+      <td class="comm-label">Comentarios del {{ term.nombre }}</td>
+      <td class="comm-text">{{ comments_per_term.get(term.id) or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<!-- ══ FIRMAS ══ -->
+<table class="sig-table no-break" cellpadding="0" cellspacing="0">
+  <tr>
+    <td>
+      <div class="sig-name">____________________________</div>
+      <div class="sig-role">Coordinadora</div>
+    </td>
+    <td>
+      <div class="sig-name">Lic. Glicerio Palacios Contreras</div>
+      <div class="sig-role">Director General</div>
+    </td>
+    <td>
+      <div class="sig-name">____________________________</div>
+      <div class="sig-role">Tutor de Aula</div>
+    </td>
+  </tr>
+</table>
+
+<!-- ══ FOOTER ══ -->
+<table class="footer-table" cellpadding="0" cellspacing="0">
+  <tr>
+    <td>
+      <strong>Complejo Educativo SAN CARLOS {{ anio }}</strong><br/>
+      Av. San Carlos 406 - Huancayo &nbsp; © 2018-2025 Sistema Académico
+    </td>
+    <td style="text-align:right">
+      Telf: 064-233700 &nbsp; Cel. 934815213 / 972648005<br/>
+      Generado: {{ fecha_emision }}
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

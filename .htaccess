@@ -1,0 +1,7 @@
+PassengerAppRoot /home/najmhqti/colegiosancarlos
+PassengerPython /home/najmhqti/virtualenv/colegiosancarlos/3.12/bin/python
+
+# Forzar HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

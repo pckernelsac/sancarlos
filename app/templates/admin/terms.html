@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Bimestres{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('admin.users') }}" class="text-brand hover:underline text-sm flex items-center gap-1">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Admin
+  </a>
+  <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+    <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-brand">Bimestres — {{ anio }}</h1>
+    <p class="text-sm text-gray-500">Gestión de periodos académicos</p>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('admin.seed_terms') }}" class="mb-6 flex items-center gap-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="number" name="anio" value="{{ anio }}" min="2020" max="2040"
+         class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-28 focus:ring-2 focus:ring-brand focus:outline-none"/>
+  <button type="submit"
+          class="bg-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-light transition">
+    Generar 4 Bimestres
+  </button>
+</form>
+
+{% if terms %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  {% for t in terms %}
+  <div class="bg-white rounded-xl shadow p-5 border-l-4 {{ 'border-red-400' if t.locked else 'border-brand' }} text-center">
+    <p class="text-xs text-gray-400 uppercase">Bimestre {{ t.orden }}</p>
+    <p class="text-lg font-bold {{ 'text-red-600' if t.locked else 'text-brand' }} mt-1">{{ t.nombre }}</p>
+    <p class="text-sm text-gray-500">{{ t.anio }}</p>
+
+    {% if t.locked %}
+    <span class="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
+      🔒 Bloqueado
+    </span>
+    {% else %}
+    <span class="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
+      🔓 Abierto
+    </span>
+    {% endif %}
+
+    {% set accion = 'Bloquear' if not t.locked else 'Desbloquear' %}
+    {% set efecto = 'no podrán' if not t.locked else 'podrán' %}
+    {% set btn_css = 'bg-red-600 hover:bg-red-700 text-white' if not t.locked else 'bg-green-600 hover:bg-green-700 text-white' %}
+    <form method="POST" action="{{ url_for('admin.toggle_term_lock', term_id=t.id) }}" class="mt-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit"
+              class="w-full text-xs font-semibold px-3 py-1.5 rounded-lg transition {{ btn_css }}"
+              onclick="return confirm('¿{{ accion }} {{ t.nombre }}? Los docentes {{ efecto }} modificar notas.')">
+        {{ '🔒 Bloquear Bimestre' if not t.locked else '🔓 Desbloquear Bimestre' }}
+      </button>
+    </form>
+
+    <!-- EDAs del bimestre -->
+    <div class="mt-3 space-y-2 border-t pt-3">
+      <p class="text-[10px] text-gray-400 uppercase font-semibold">EDAs</p>
+      {% for eda in t.edas.all() %}
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs font-medium {{ 'text-red-600' if eda.locked else 'text-gray-700' }}">
+          {{ eda.nombre }}
+          {% if eda.locked %}🔒{% else %}🔓{% endif %}
+        </span>
+        <form method="POST" action="{{ url_for('admin.toggle_eda_lock', eda_id=eda.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% set eda_btn = 'bg-red-500 hover:bg-red-600' if not eda.locked else 'bg-green-500 hover:bg-green-600' %}
+          <button type="submit"
+                  class="text-[10px] font-semibold px-2 py-0.5 rounded text-white transition {{ eda_btn }}"
+                  onclick="return confirm('¿{{ 'Bloquear' if not eda.locked else 'Desbloquear' }} {{ eda.nombre }}?')">
+            {{ '🔒' if not eda.locked else '🔓' }}
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-yellow-800 text-sm">
+  No hay bimestres para {{ anio }}. Usa el botón para generarlos.
+</div>
+{% endif %}
+{% endblock %}

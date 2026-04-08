@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Iniciar Sesión | Colegio San Carlos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { brand: { DEFAULT: '#0e2f77', light: '#1a4499', dark: '#0a2158' } } } }
+    }
+  </script>
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-10px); }
+    }
+    .animate-fade-in-up { animation: fadeInUp .6s ease-out both; }
+    .animate-fade-in    { animation: fadeIn .8s ease-out both; }
+    .animate-float      { animation: float 6s ease-in-out infinite; }
+    .delay-100 { animation-delay: .1s; }
+    .delay-200 { animation-delay: .2s; }
+    .delay-300 { animation-delay: .3s; }
+    .delay-400 { animation-delay: .4s; }
+
+    .input-group:focus-within label {
+      color: #0e2f77;
+    }
+    .input-group:focus-within .input-icon {
+      color: #0e2f77;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+
+<div class="min-h-screen flex">
+
+  <!-- ═══ Lado izquierdo: Branding ═══ -->
+  <div class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-brand-dark via-brand to-[#1a3d8f]">
+    <div class="absolute inset-0 opacity-10">
+      <div class="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
+      <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-300 rounded-full blur-3xl"></div>
+      <div class="absolute top-1/2 left-1/3 w-48 h-48 bg-yellow-400 rounded-full blur-3xl"></div>
+    </div>
+
+    <svg class="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+    </svg>
+
+    <div class="relative z-10 flex flex-col items-center justify-center w-full px-12">
+      <div class="animate-float mb-8">
+        <div class="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20 shadow-2xl">
+          <img src="{{ url_for('static', filename='img/logosancarlos.png') }}"
+               alt="Colegio San Carlos"
+               class="w-40 h-40 object-contain drop-shadow-lg"/>
+        </div>
+      </div>
+
+      <div class="text-center animate-fade-in">
+        <h2 class="text-white text-3xl font-bold tracking-tight mb-2">Colegio San Carlos</h2>
+        <div class="w-16 h-1 bg-yellow-400 rounded-full mx-auto mb-4"></div>
+        <p class="text-blue-200 text-base max-w-sm leading-relaxed">
+          Sistema Académico Integral para la gestión educativa
+        </p>
+        <p class="text-blue-300/70 text-sm mt-6 flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Huancayo, Perú
+        </p>
+      </div>
+
+      <div class="mt-10 grid grid-cols-3 gap-6 text-center animate-fade-in delay-300">
+        <div class="text-white/80">
+          <div class="bg-white/10 rounded-xl p-3 w-12 h-12 flex items-center justify-center mx-auto mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+          </div>
+          <p class="text-xs font-medium">Notas</p>
+        </div>
+        <div class="text-white/80">
+          <div class="bg-white/10 rounded-xl p-3 w-12 h-12 flex items-center justify-center mx-auto mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <p class="text-xs font-medium">Asistencia</p>
+        </div>
+        <div class="text-white/80">
+          <div class="bg-white/10 rounded-xl p-3 w-12 h-12 flex items-center justify-center mx-auto mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <p class="text-xs font-medium">Reportes</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Lado derecho: Formulario ═══ -->
+  <div class="w-full lg:w-1/2 flex items-center justify-center px-6 py-10">
+    <div class="w-full max-w-md">
+
+      <div class="lg:hidden text-center mb-8 animate-fade-in-up">
+        <img src="{{ url_for('static', filename='img/logohorizontal.png') }}"
+             alt="Colegio San Carlos"
+             class="h-16 object-contain mx-auto mb-3"/>
+        <div class="w-12 h-0.5 bg-brand rounded-full mx-auto"></div>
+      </div>
+
+      <div class="mb-8 animate-fade-in-up delay-100">
+        <h1 class="text-3xl font-bold text-gray-900">Bienvenido</h1>
+        <p class="text-gray-500 mt-2">Ingresa tus credenciales para acceder al sistema</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="mb-5 space-y-2 animate-fade-in-up delay-100">
+        {% for cat, msg in messages %}
+        <div class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+          {% if cat == 'success' %}bg-green-50 border border-green-200 text-green-700
+          {% elif cat == 'danger' %}bg-red-50 border border-red-200 text-red-700
+          {% elif cat == 'warning' %}bg-amber-50 border border-amber-200 text-amber-700
+          {% else %}bg-blue-50 border border-blue-200 text-blue-700{% endif %}">
+          {% if cat == 'danger' %}
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          {% endif %}
+          {{ msg }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('auth.login_post') }}" novalidate class="space-y-5">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <div class="input-group animate-fade-in-up delay-200">
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5 transition-colors">
+            Usuario
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg class="w-5 h-5 text-gray-400 input-icon transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+            </div>
+            <input type="text" name="username" required minlength="3" maxlength="64" autofocus
+                   class="w-full border border-gray-300 rounded-xl pl-12 pr-4 py-3.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all"
+                   placeholder="Tu nombre de usuario"/>
+          </div>
+        </div>
+
+        <div class="input-group animate-fade-in-up delay-300">
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5 transition-colors">
+            Contraseña
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg class="w-5 h-5 text-gray-400 input-icon transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+            </div>
+            <input type="password" name="password" id="password-input" required
+                   class="w-full border border-gray-300 rounded-xl pl-12 pr-12 py-3.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all"
+                   placeholder="Ingresa tu contraseña"/>
+            <button type="button" onclick="togglePassword()" id="toggle-pw"
+                    class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-brand transition-colors">
+              <svg id="eye-off" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"/>
+              </svg>
+              <svg id="eye-on" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between animate-fade-in-up delay-300">
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" name="remember_me" value="true" class="w-4 h-4 accent-brand rounded"/>
+            <span class="text-sm text-gray-600">Mantener sesión</span>
+          </label>
+        </div>
+
+        <div class="animate-fade-in-up delay-400">
+          <button type="submit"
+                  class="w-full bg-brand hover:bg-brand-light text-white font-bold py-3.5 rounded-xl text-base transition-all duration-200 active:scale-[0.98] shadow-lg shadow-brand/25 hover:shadow-xl hover:shadow-brand/30 flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+            </svg>
+            Ingresar al Sistema
+          </button>
+        </div>
+      </form>
+
+      <div class="mt-10 text-center animate-fade-in delay-400">
+        <div class="flex items-center gap-3 justify-center text-gray-400 text-xs">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          Conexión segura
+        </div>
+        <p class="text-gray-300 text-xs mt-3">
+          Colegio San Carlos &copy; 2026 — Sistema Académico
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function togglePassword() {
+  const input = document.getElementById('password-input');
+  const eyeOff = document.getElementById('eye-off');
+  const eyeOn = document.getElementById('eye-on');
+  if (input.type === 'password') {
+    input.type = 'text';
+    eyeOff.classList.add('hidden');
+    eyeOn.classList.remove('hidden');
+  } else {
+    input.type = 'password';
+    eyeOff.classList.remove('hidden');
+    eyeOn.classList.add('hidden');
+  }
+}
+</script>
+</body>
+</html>

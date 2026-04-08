@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}San Carlos{% endblock %} | Sistema Académico</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { brand: { DEFAULT: '#0e2f77', light: '#1a4499', dark: '#0a2158' } } } }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .badge-AD { background:#dbeafe; color:#1e40af; }
+    .badge-A  { background:#dcfce7; color:#166534; }
+    .badge-B  { background:#fef9c3; color:#854d0e; }
+    .badge-C  { background:#fee2e2; color:#991b1b; }
+
+    /* ── Layout con sidebar ── */
+    body.has-sidebar #main-wrapper            { margin-left: 240px; }
+    body.has-sidebar.sb-collapsed #main-wrapper { margin-left: 64px; }
+
+    /* ── Ancho del sidebar ── */
+    #sidebar { width: 240px; }
+    body.sb-collapsed #sidebar { width: 64px; }
+
+    /* ── Ocultar textos al colapsar ── */
+    body.sb-collapsed .nav-label      { display: none; }
+    body.sb-collapsed .brand-text     { display: none; }
+    body.sb-collapsed .section-label  { display: none; }
+    body.sb-collapsed .user-expanded  { display: none; }
+    body.sb-collapsed .user-collapsed { display: flex !important; }
+
+    /* ── Centrar íconos al colapsar ── */
+    body.sb-collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; margin: 0 8px; }
+
+    /* ── Tooltip colapsado ── */
+    .nav-tooltip {
+      position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+      background: #1e293b; color: #fff; font-size: 12px; font-weight: 500;
+      padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+      pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 200;
+    }
+    .nav-tooltip::before {
+      content: ''; position: absolute; right: 100%; top: 50%; transform: translateY(-50%);
+      border: 5px solid transparent; border-right-color: #1e293b;
+    }
+    body.sb-collapsed .nav-item:hover .nav-tooltip { opacity: 1; }
+    body.sb-collapsed #sidebar          { overflow: visible; }
+    body.sb-collapsed #sidebar-nav      { overflow: visible; }
+
+    /* ── Scrollbar sidebar ── */
+    #sidebar-nav::-webkit-scrollbar { width: 3px; }
+    #sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+    #sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 1023px) {
+      #sidebar { transform: translateX(-100%); width: 240px !important; }
+      body.has-sidebar #main-wrapper { margin-left: 0 !important; }
+      body.sb-open #sidebar { transform: translateX(0); }
+    }
+
+    /* ── Transition sidebar ── */
+    #sidebar, #main-wrapper { transition: width .3s ease, margin-left .3s ease, transform .3s ease; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+
+<body class="bg-gray-100 min-h-screen {{ 'has-sidebar' if current_user.is_authenticated else '' }}">
+
+{% if current_user.is_authenticated %}
+
+{# ── Macros de navegación ── #}
+{% macro nav_item(endpoint, active, icon_path, label) %}
+<a href="{{ url_for(endpoint) }}"
+   class="nav-item relative flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl transition-all duration-150
+          {{ 'bg-white/20 text-white shadow-sm' if active else 'text-blue-100 hover:bg-white/10 hover:text-white' }}">
+  <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ icon_path }}"/>
+  </svg>
+  <span class="nav-label text-sm font-medium whitespace-nowrap">{{ label }}</span>
+  <span class="nav-tooltip">{{ label }}</span>
+</a>
+{% endmacro %}
+
+{% macro nav_section(label) %}
+<p class="section-label px-5 pt-5 pb-1.5 text-[10px] font-bold text-blue-300/70 uppercase tracking-widest">{{ label }}</p>
+{% endmacro %}
+
+{% set ep = request.endpoint or '' %}
+{% set bp = request.blueprint or '' %}
+
+<!-- Overlay móvil -->
+<div id="overlay" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden" onclick="sbClose()"></div>
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<aside id="sidebar"
+       class="fixed left-0 top-0 h-full bg-[#0e2f77] z-40 flex flex-col shadow-2xl">
+
+  <!-- Brand -->
+  <div class="flex items-center gap-3 px-4 py-[14px] border-b border-white/10 shrink-0">
+    <img src="{{ url_for('static', filename='img/logosancarlos.png') }}"
+         alt="Logo" class="w-9 h-9 object-contain shrink-0 drop-shadow"/>
+    <div class="brand-text overflow-hidden">
+      <div class="text-white font-bold text-sm leading-tight whitespace-nowrap">Colegio San Carlos</div>
+      <div class="text-blue-200 text-[11px] whitespace-nowrap">Sistema Académico</div>
+    </div>
+  </div>
+
+  <!-- Navegación -->
+  <nav id="sidebar-nav" class="flex-1 py-2 overflow-y-auto overflow-x-hidden">
+
+    {{ nav_section('General') }}
+    {{ nav_item('main.dashboard', ep == 'main.dashboard',
+        'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+        'Dashboard') }}
+    {{ nav_item('students.list_students', bp == 'students',
+        'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+        'Estudiantes') }}
+
+    {% if current_user.has_role('ADMIN', 'DOCENTE') %}
+    {{ nav_section('Académico') }}
+    {{ nav_item('grades.matrix', ep == 'grades.matrix',
+        'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+        'Notas') }}
+    {{ nav_item('grades.eda_matrix', ep == 'grades.eda_matrix',
+        'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+        'EDAs') }}
+    {{ nav_item('grades.registro_auxiliar', ep.startswith('grades.registro'),
+        'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+        'Reg. Auxiliar') }}
+    {{ nav_item('ranking.index', bp == 'ranking',
+        'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',
+        'Cuadro de Mérito') }}
+    {{ nav_item('consolidado.index', bp == 'consolidado',
+        'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+        'Consolidado') }}
+    {% endif %}
+
+    {% if current_user.has_role('ADMIN', 'AUXILIAR') %}
+    {{ nav_section('Convivencia') }}
+    {{ nav_item('attendance.index', bp == 'attendance',
+        'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+        'Asistencia') }}
+    {{ nav_item('behavior.index', bp == 'behavior',
+        'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+        'Conducta') }}
+    {{ nav_item('parents.index', bp == 'parents',
+        'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+        'PPFF') }}
+    {% endif %}
+
+    {% if current_user.has_role('ADMIN') %}
+    {{ nav_section('Administración') }}
+    {{ nav_item('admin.users', ep in ('admin.users','admin.new_user','admin.edit_user'),
+        'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+        'Usuarios') }}
+{{ nav_item('admin.terms', ep == 'admin.terms',
+        'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
+        'Bimestres') }}
+    {{ nav_item('admin.courses', ep == 'admin.courses',
+        'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
+        'Cursos') }}
+    {{ nav_item('reports.boletas_masivas', ep == 'reports.boletas_masivas',
+        'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
+        'Boletas Masivas') }}
+    {% endif %}
+
+  </nav>
+
+  <!-- Usuario + acciones -->
+  <div class="border-t border-white/10 px-3 py-3 shrink-0">
+    <!-- Vista expandida -->
+    <div class="user-expanded flex items-center gap-3">
+      <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0
+                  text-white font-bold text-sm uppercase">
+        {{ current_user.full_name[0] }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white text-xs font-semibold truncate">{{ current_user.full_name }}</div>
+        <div class="text-blue-200 text-[10px]">{{ current_user.role.value }}</div>
+      </div>
+      <a href="{{ url_for('auth.change_password') }}"
+         class="text-blue-200 hover:text-white transition shrink-0" title="Cambiar contraseña">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+        </svg>
+      </a>
+      <a href="{{ url_for('auth.logout') }}"
+         class="text-blue-200 hover:text-white transition shrink-0" title="Cerrar sesión">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+      </a>
+    </div>
+    <!-- Vista colapsada -->
+    <div class="user-collapsed hidden flex-col items-center gap-2">
+      <div class="nav-item relative flex items-center justify-center w-10 h-10 bg-white/20 rounded-full
+                  text-white font-bold text-sm uppercase cursor-default">
+        {{ current_user.full_name[0] }}
+        <span class="nav-tooltip">{{ current_user.full_name }}</span>
+      </div>
+      <a href="{{ url_for('auth.change_password') }}"
+         class="nav-item relative flex items-center justify-center w-10 h-10 rounded-xl
+                text-blue-200 hover:bg-white/10 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+        </svg>
+        <span class="nav-tooltip">Cambiar contraseña</span>
+      </a>
+      <a href="{{ url_for('auth.logout') }}"
+         class="nav-item relative flex items-center justify-center w-10 h-10 rounded-xl
+                text-blue-200 hover:bg-white/10 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        <span class="nav-tooltip">Cerrar sesión</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Botón colapsar (solo desktop) -->
+  <button id="sb-toggle" onclick="sbToggle()"
+          class="hidden lg:flex absolute -right-3 top-[72px] w-6 h-6 bg-white border border-gray-200
+                 rounded-full items-center justify-center shadow-md hover:bg-gray-50 transition"
+          title="Colapsar menú">
+    <svg id="sb-icon" class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </button>
+</aside>
+<!-- ═══════ FIN SIDEBAR ═══════ -->
+
+{% endif %}{# end is_authenticated #}
+
+<!-- ═══════ WRAPPER PRINCIPAL ═══════ -->
+<div id="main-wrapper" class="min-h-screen flex flex-col">
+
+  {% if current_user.is_authenticated %}
+  <!-- Top bar -->
+  <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-sm">
+    <button class="lg:hidden text-gray-500 hover:text-brand transition" onclick="sbOpen()">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+    <div class="flex-1"></div>
+    <span class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+      {% if current_user.has_role('ADMIN') %}bg-purple-100 text-purple-700
+      {% elif current_user.has_role('DOCENTE') %}bg-blue-100 text-blue-700
+      {% else %}bg-green-100 text-green-700{% endif %}">
+      {{ current_user.role.value }}
+    </span>
+    <span class="text-sm text-gray-700 font-medium hidden sm:block">{{ current_user.full_name }}</span>
+  </header>
+  {% endif %}
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="px-4 md:px-6 pt-4 space-y-2">
+    {% for cat, msg in messages %}
+    <div class="flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium
+      {% if cat == 'success' %}bg-green-50 border-green-300 text-green-800
+      {% elif cat == 'danger' %}bg-red-50 border-red-300 text-red-800
+      {% elif cat == 'warning' %}bg-yellow-50 border-yellow-300 text-yellow-800
+      {% else %}bg-blue-50 border-blue-300 text-blue-800{% endif %}">
+      {{ msg }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <!-- Contenido -->
+  <main class="flex-1 px-4 md:px-6 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="bg-white border-t py-3 text-center text-xs text-gray-400">
+    Colegio San Carlos &copy; 2026 — Sistema Académico
+  </footer>
+</div>
+<!-- ═══════ FIN WRAPPER ═══════ -->
+
+<!-- Toast global -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+  <div id="toast-body" class="px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium"></div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+{% if current_user.is_authenticated %}
+<script>
+const SB_KEY = 'sc_sb';
+function sbApply(collapsed) {
+  const body = document.body;
+  const icon = document.getElementById('sb-icon');
+  if (collapsed) {
+    body.classList.add('sb-collapsed');
+    if (icon) icon.style.transform = 'rotate(180deg)';
+  } else {
+    body.classList.remove('sb-collapsed');
+    if (icon) icon.style.transform = '';
+  }
+}
+function sbToggle() {
+  const collapsed = !document.body.classList.contains('sb-collapsed');
+  sbApply(collapsed);
+  localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
+}
+function sbOpen() {
+  document.body.classList.add('sb-open');
+  document.getElementById('overlay').classList.remove('hidden');
+}
+function sbClose() {
+  document.body.classList.remove('sb-open');
+  document.getElementById('overlay').classList.add('hidden');
+}
+// Restaurar estado al cargar
+(function () {
+  if (localStorage.getItem(SB_KEY) === '1') sbApply(true);
+})();
+</script>
+{% endif %}
+
+<!-- Cascada Nivel → Grado (global) -->
+<script>
+(function(){
+  const GRADOS_POR_NIVEL = {
+    'INICIAL':    [{v:'3',t:'3 AÑOS'},{v:'4',t:'4 AÑOS'},{v:'5',t:'5 AÑOS'}],
+    'PRIMARIA':   [{v:'1',t:'1°'},{v:'2',t:'2°'},{v:'3',t:'3°'},{v:'4',t:'4°'},{v:'5',t:'5°'},{v:'6',t:'6°'}],
+    'SECUNDARIA': [{v:'1',t:'1°'},{v:'2',t:'2°'},{v:'3',t:'3°'},{v:'4',t:'4°'},{v:'5',t:'5°'}]
+  };
+
+  document.querySelectorAll('select[name="nivel"]').forEach(function(selNivel){
+    const form = selNivel.closest('form');
+    if(!form) return;
+    const selGrado = form.querySelector('select[name="grado"]');
+    if(!selGrado) return;
+
+    const savedGrado = selGrado.value;
+
+    function updateGrados(){
+      const nivel = selNivel.value;
+      const opts = GRADOS_POR_NIVEL[nivel] || [];
+      const cur = selGrado.value;
+      // Guardar placeholder
+      const ph = selGrado.querySelector('option[value=""]');
+      selGrado.innerHTML = '';
+      if(ph) selGrado.appendChild(ph);
+      else {
+        const o = document.createElement('option');
+        o.value = ''; o.textContent = '-- Grado --';
+        selGrado.appendChild(o);
+      }
+      opts.forEach(function(g){
+        const o = document.createElement('option');
+        o.value = g.v; o.textContent = g.t;
+        if(g.v === cur) o.selected = true;
+        selGrado.appendChild(o);
+      });
+    }
+
+    selNivel.addEventListener('change', function(){
+      updateGrados();
+      selGrado.value = '';
+    });
+    // Inicializar al cargar
+    updateGrados();
+    selGrado.value = savedGrado;
+  });
+})();
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>
