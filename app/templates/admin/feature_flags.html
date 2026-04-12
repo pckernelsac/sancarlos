@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Opciones para docentes{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('admin.users') }}" class="text-brand hover:underline text-sm flex items-center gap-1">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Admin
+  </a>
+  <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+    <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-brand">Opciones para docentes</h1>
+    <p class="text-sm text-gray-500">Active o desactive funciones visibles para el rol docente.</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('admin.feature_flags_post') }}" class="max-w-2xl">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+    <h2 class="text-lg font-bold text-gray-800 mb-2">Matriz de EDAs</h2>
+    <p class="text-sm text-gray-600 mb-4">
+      Ruta <span class="font-mono text-xs bg-gray-100 px-1 rounded">/grades/eda-matrix</span>.
+      Los administradores siempre pueden acceder. Si desactiva esta opción, los docentes no verán el ítem «EDAs» en el menú ni podrán abrir la página.
+    </p>
+    <label class="flex items-start gap-3 cursor-pointer group">
+      <input type="checkbox" name="eda_matrix_docente" value="on"
+             class="mt-1 rounded border-gray-300 text-brand focus:ring-brand"
+             {% if eda_matrix_docente %}checked{% endif %}>
+      <span>
+        <span class="font-semibold text-gray-800 group-hover:text-brand">Permitir a docentes usar la matriz de EDAs</span>
+        <span class="block text-sm text-gray-500 mt-0.5">Desmarcar oculta la función solo para docentes; el registro auxiliar y demás rutas no cambian.</span>
+      </span>
+    </label>
+  </section>
+
+  <div class="mt-6 flex gap-3">
+    <button type="submit" class="bg-brand text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-brand-light transition">
+      Guardar
+    </button>
+  </div>
+</form>
+{% endblock %}

@@ -26,7 +26,8 @@ from app.services.registro_pdf_service import generate_registro_auxiliar_pdf_byt
 from app.models.student import Student, GRADOS, SECCIONES, NIVELES
 from app.models.academic import Course, Term, EDA
 from app.models.user import User
-from app import render, redirect_to
+from app import render, redirect_to, flash
+from app.services.feature_flags import is_eda_matrix_enabled_for_docentes
 from app.utils.scope import sanitize_nivel_grado, user_allowed_grados
 from app.utils.safe_errors import log_unexpected_exc, GENERIC_USER_MESSAGE
 import datetime
@@ -165,6 +166,14 @@ async def save_grade(request: Request, current_user: User = Depends(require_role
 
 @router.get("/eda-matrix", name="grades.eda_matrix")
 async def eda_matrix(request: Request, current_user: User = Depends(require_role("ADMIN", "DOCENTE"))):
+    if current_user.has_role("DOCENTE") and not is_eda_matrix_enabled_for_docentes():
+        flash(
+            request,
+            "La matriz de EDAs no está habilitada para docentes. Consulte al administrador.",
+            "warning",
+        )
+        return redirect_to("/dashboard")
+
     anio = int(request.query_params.get("anio", datetime.date.today().year))
     nivel, grado = sanitize_nivel_grado(
         request.query_params.get("nivel", "PRIMARIA"),
@@ -250,6 +259,12 @@ async def save_eda_comment(request: Request, current_user: User = Depends(requir
         p = SaveEdaCommentPayload.model_validate(await request.json())
     except ValidationError:
         return JSONResponse({"ok": False, "error": "Datos inválidos."}, status_code=400)
+
+    if current_user.has_role("DOCENTE") and not is_eda_matrix_enabled_for_docentes():
+        return JSONResponse(
+            {"ok": False, "error": "La matriz de EDAs está desactivada para docentes."},
+            status_code=403,
+        )
 
     student = db.session.get(Student, p.student_id)
     if not student:

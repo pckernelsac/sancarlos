@@ -16,6 +16,10 @@ from app.services.excel_import_teachers import (
     generate_teachers_template_excel,
     MAX_EXCEL_BYTES as _TEACHERS_EXCEL_MAX_BYTES,
 )
+from app.services.feature_flags import (
+    is_eda_matrix_enabled_for_docentes,
+    set_eda_matrix_enabled_for_docentes,
+)
 from app.models.student import GRADOS, NIVELES, GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
 from app import render, flash, redirect_to
 import datetime
@@ -303,6 +307,28 @@ async def boleta_firmas_save(request: Request, current_user: User = Depends(requ
         log_unexpected_exc(exc, "admin.boleta_firmas_post")
         flash(request, GENERIC_FLASH_MESSAGE, "danger")
     return redirect_to("/admin/boleta-firmas")
+
+
+@router.get("/feature-flags", name="admin.feature_flags")
+async def feature_flags_page(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    return render(
+        request,
+        "admin/feature_flags.html",
+        eda_matrix_docente=is_eda_matrix_enabled_for_docentes(),
+    )
+
+
+@router.post("/feature-flags", name="admin.feature_flags_post")
+async def feature_flags_save(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    form = await request.form()
+    try:
+        set_eda_matrix_enabled_for_docentes(form.get("eda_matrix_docente") == "on")
+        flash(request, "Opciones guardadas.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        log_unexpected_exc(exc, "admin.feature_flags_post")
+        flash(request, GENERIC_FLASH_MESSAGE, "danger")
+    return redirect_to("/admin/feature-flags")
 
 
 @router.post("/terms/seed", name="admin.seed_terms")

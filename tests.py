@@ -371,6 +371,37 @@ class TestPermissions:
         assert resp.status_code in (303, 403)
 
 
+class TestEdaMatrixFeatureFlag:
+    def test_docente_redirected_when_eda_matrix_disabled(self, client, seed):
+        from app.services.feature_flags import set_eda_matrix_enabled_for_docentes
+
+        set_eda_matrix_enabled_for_docentes(False)
+        try:
+            login(client, "docente", "docente1234")
+            resp = client.get("/grades/eda-matrix", follow_redirects=False)
+            assert resp.status_code == 303
+            assert "/dashboard" in (resp.headers.get("location") or "")
+        finally:
+            set_eda_matrix_enabled_for_docentes(True)
+
+    def test_admin_eda_matrix_ok_when_disabled_for_docentes(self, client, seed):
+        from app.services.feature_flags import set_eda_matrix_enabled_for_docentes
+
+        set_eda_matrix_enabled_for_docentes(False)
+        try:
+            login(client, "admin", "admin1234")
+            resp = client.get("/grades/eda-matrix", follow_redirects=True)
+            assert resp.status_code == 200
+        finally:
+            set_eda_matrix_enabled_for_docentes(True)
+
+    def test_admin_feature_flags_page(self, client, seed):
+        login(client, "admin", "admin1234")
+        resp = client.get("/admin/feature-flags")
+        assert resp.status_code == 200
+        assert "Matriz de EDAs" in resp.text
+
+
 # ─── 6. Tests de rutas principales ──────────────────────────────────
 
 class TestRoutes:

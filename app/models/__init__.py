@@ -2,6 +2,7 @@
 from app.models.user import User, RoleEnum, TeacherCourse  # noqa
 from app.models.student import Student  # noqa
 from app.models.boleta_staff import BoletaStaffConfig  # noqa
+from app.models.app_setting import AppSetting  # noqa
 from app.models.academic import (  # noqa
     Course, Term, EDA, EdaGrade, EdaComment, Grade,
     Attendance, RegistroSemana, RegistroExamen,

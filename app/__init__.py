@@ -1,4 +1,6 @@
+import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -22,11 +24,29 @@ STATIC_DIR = APP_DIR / "static"
 
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
+_log_db = logging.getLogger("app.database")
+
 
 def create_app() -> FastAPI:
     cfg = get_config()
 
-    app = FastAPI(title="San Carlos — Sistema Académico", docs_url=None, redoc_url=None)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Por si el worker arranca sin haber pasado por el bloque síncrono (defensa en profundidad).
+        try:
+            db.ensure_schema()
+            _log_db.warning("sancarlos: esquema de base de datos verificado (ensure_schema OK)")
+        except Exception:
+            _log_db.exception("sancarlos: fallo al asegurar esquema de BD")
+            raise
+        yield
+
+    app = FastAPI(
+        title="San Carlos — Sistema Académico",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
 
     # --- Base de datos ---
     db.init(cfg.DATABASE_URL)
@@ -51,6 +71,9 @@ def create_app() -> FastAPI:
 
     # --- Importar modelos (registra las tablas) ---
     from app import models as _models  # noqa
+
+    # Crear tablas y comprobar que exista al menos `users` (evita UndefinedTable en /auth/login).
+    db.ensure_schema()
 
     # --- Routers (equivalente a Blueprints) ---
     from app.auth.routes import router as auth_router
@@ -89,7 +112,8 @@ def create_app() -> FastAPI:
         try:
             return await call_next(request)
         except Exception as exc:
-            log_unexpected_exc(exc, "unhandled request exception")
+            path = request.url.path
+            log_unexpected_exc(exc, f"unhandled request exception path={path}")
             raise
 
     # --- Middleware para limpiar la sesión de BD después de cada request ---
@@ -208,11 +232,14 @@ def _base_context(request: Request) -> dict:
 
     request_compat = _RequestCompat(request, endpoint_name)
 
+    from app.services.feature_flags import is_eda_matrix_enabled_for_docentes
+
     return {
         "request": request_compat,
         "current_user": current_user,
         "csrf_token": csrf_token,
         "get_flashed_messages": lambda with_categories=False: messages if with_categories else [m for _, m in messages],
+        "eda_matrix_docente_enabled": is_eda_matrix_enabled_for_docentes(),
     }
 
 

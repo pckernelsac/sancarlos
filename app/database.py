@@ -82,6 +82,25 @@ class _Database:
     def create_all(self):
         Base.metadata.create_all(self.engine)
 
+    def ensure_schema(self) -> None:
+        """
+        Crea tablas faltantes y comprueba que el esquema mínimo exista.
+        Falla al arrancar si la BD está vacía o sin permisos CREATE (mejor que un 500 en login).
+        """
+        from sqlalchemy import inspect
+
+        self.create_all()
+        insp = inspect(self.engine)
+        if self.engine.dialect.name == "postgresql":
+            names = insp.get_table_names(schema="public")
+        else:
+            names = insp.get_table_names()
+        if "users" not in names:
+            raise RuntimeError(
+                "Tras create_all() no existe la tabla 'users'. Revise DATABASE_URL, que apunte "
+                "a la base correcta y que el usuario tenga permiso CREATE en el esquema public."
+            )
+
     def drop_all(self):
         Base.metadata.drop_all(self.engine)
 
