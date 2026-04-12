@@ -125,7 +125,7 @@ async def boleta_pdf(token: str, request: Request, current_user: User = Depends(
     pdf_bytes = generate_boleta_primaria_pdf(ctx)
     filename = f"boleta_{ctx['student'].codigo}_{anio}.pdf"
     return Response(content=pdf_bytes, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{filename}"'})
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.get("/student/{token}/boleta-inicial", name="reports.boleta_inicial_preview")
@@ -156,7 +156,7 @@ async def boleta_inicial_pdf(token: str, request: Request, current_user: User = 
     pdf_bytes = generate_boleta_inicial_pdf(ctx)
     filename = f"boleta_ini_{ctx['student'].codigo}_{anio}.pdf"
     return Response(content=pdf_bytes, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{filename}"'})
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 # ── Boletas masivas ────────────────────────────────────────────────────────────
@@ -314,4 +314,4 @@ async def boleta_secundaria_pdf(token: str, request: Request, current_user: User
     pdf_bytes = generate_boleta_secundaria_pdf(ctx)
     filename = f"boleta_sec_{ctx['student'].codigo}_{anio}.pdf"
     return Response(content=pdf_bytes, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{filename}"'})
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})

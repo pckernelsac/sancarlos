@@ -169,16 +169,22 @@
             </a>
             {% endif %}
             {% if current_user.has_role('ADMIN') %}
-            <a href="{{ url_for('reports.boleta_inicial_pdf' if s.nivel == 'INICIAL' else ('reports.boleta_secundaria_pdf' if s.nivel == 'SECUNDARIA' else 'reports.boleta_pdf'), token=s.id|mask_id) }}" target="_blank"
-               class="group/btn relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-200 hover:shadow-md">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <button type="button"
+               class="boleta-pdf-btn group/btn relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-200 hover:shadow-md cursor-pointer disabled:cursor-wait disabled:opacity-80"
+               data-boleta-url="{{ url_for('reports.boleta_inicial_pdf' if s.nivel == 'INICIAL' else ('reports.boleta_secundaria_pdf' if s.nivel == 'SECUNDARIA' else 'reports.boleta_pdf'), token=s.id|mask_id) }}"
+               title="Descargar boleta PDF">
+              <svg class="boleta-pdf-idle w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round"
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
               </svg>
-              <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none">
-                Boleta PDF
+              <svg class="boleta-pdf-loading w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none z-10">
+                Descargar boleta
               </span>
-            </a>
+            </button>
             <form method="POST" action="{{ url_for('students.delete_student_view', token=s.id|mask_id) }}"
                   class="inline"
                   onsubmit="return confirm('¿Eliminar a {{ s.full_name }}? Esta acción no se puede deshacer.')">
@@ -221,6 +227,9 @@
   </svg>
   <p class="text-xs text-gray-400">Total: {{ students | length }} estudiantes</p>
 </div>
+
+<!-- Toasts: boleta PDF y otros avisos sin alert() -->
+<div id="student-toast-host" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-[calc(100%-2rem)] sm:w-auto pointer-events-none" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -230,6 +239,82 @@
     const q = this.value.toLowerCase().trim();
     document.querySelectorAll('.student-row').forEach(row => {
       row.style.display = (q === '' || row.dataset.search.includes(q)) ? '' : 'none';
+    });
+  });
+
+  function _filenameFromContentDisposition(cd) {
+    if (!cd) return 'boleta.pdf';
+    const star = cd.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
+    if (star) {
+      try { return decodeURIComponent(star[1].replace(/"/g, '')); } catch (e) { /* ignore */ }
+    }
+    const q = cd.match(/filename\s*=\s*"([^"]+)"/i);
+    if (q) return q[1];
+    const u = cd.match(/filename\s*=\s*([^;\s]+)/i);
+    if (u) return u[1].replace(/"/g, '');
+    return 'boleta.pdf';
+  }
+
+  function showStudentToast(message, kind) {
+    var host = document.getElementById('student-toast-host');
+    if (!host) return;
+    var el = document.createElement('div');
+    el.setAttribute('role', 'status');
+    el.className = 'pointer-events-auto rounded-xl shadow-lg px-4 py-3 text-sm font-medium border transition-opacity duration-300 ';
+    if (kind === 'error') {
+      el.className += 'bg-red-50 text-red-900 border-red-200';
+    } else {
+      el.className += 'bg-emerald-50 text-emerald-900 border-emerald-200';
+    }
+    el.textContent = message;
+    host.appendChild(el);
+    var ms = kind === 'error' ? 6500 : 4000;
+    setTimeout(function () {
+      el.style.opacity = '0';
+      setTimeout(function () { el.remove(); }, 320);
+    }, ms);
+  }
+
+  // Boleta PDF: indicador de carga aquí; al terminar se descarga el archivo (sin pestaña nueva)
+  document.querySelectorAll('.boleta-pdf-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const url = this.dataset.boletaUrl;
+      if (!url || this.disabled) return;
+      const idle = this.querySelector('.boleta-pdf-idle');
+      const loading = this.querySelector('.boleta-pdf-loading');
+      this.disabled = true;
+      this.setAttribute('aria-busy', 'true');
+      if (idle) idle.classList.add('hidden');
+      if (loading) loading.classList.remove('hidden');
+      try {
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) {
+          throw new Error(res.status === 403 ? 'Sin permiso para esta boleta.' : 'No se pudo generar el PDF (' + res.status + ').');
+        }
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        if (!ct.includes('application/pdf')) {
+          throw new Error('La respuesta no es un PDF. ¿Sesión expirada? Recargue la página e intente de nuevo.');
+        }
+        const filename = _filenameFromContentDisposition(res.headers.get('Content-Disposition'));
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        a.download = filename;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(objUrl); }, 4000);
+        showStudentToast('Descarga lista: ' + filename, 'success');
+      } catch (e) {
+        showStudentToast(e.message || 'Error al generar la boleta.', 'error');
+      } finally {
+        this.disabled = false;
+        this.removeAttribute('aria-busy');
+        if (idle) idle.classList.remove('hidden');
+        if (loading) loading.classList.add('hidden');
+      }
     });
   });
 </script>
