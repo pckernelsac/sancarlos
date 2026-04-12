@@ -56,7 +56,6 @@ body {
 .td-area { background: #d6e4f0; font-weight: bold; font-size: 6.5pt; }
 .td-course { text-align: left; padding-left: 4pt; font-size: 6.5pt; }
 .td-prom { background: #dce6f1; font-weight: bold; font-size: 9.5pt; }
-.td-merit { background: #0e2f77; color: #fff; font-weight: bold; font-size: 6.5pt; }
 
 /* badges cualitativos */
 .q-AD { background: #dbeafe; color: #1e40af; font-weight: bold; font-size: 9.5pt; }
@@ -235,19 +234,6 @@ body {
       </tr>
     {% endfor %}
 
-    <!-- Orden de Mérito -->
-    <tr>
-      <td class="td-merit" colspan="2">Orden de Mérito</td>
-      {% set bim_labels = ['IB','IIB','IIIB','IVB'] %}
-      {% for term in terms %}
-      <td colspan="3" class="td-merit">{{ bim_labels[loop.index0] }}</td>
-      {% set r = merit_per_term.get(term.id) %}
-      <td class="td-merit">{{ r ~ '°' if r else '-' }}</td>
-      {% endfor %}
-      <td class="td-merit">
-        {% if merit_final %}{{ merit_final }}°{% else %}-{% endif %}
-      </td>
-    </tr>
   </tbody>
 </table>
 </div>
@@ -415,15 +401,15 @@ body {
 <table class="sig-table no-break" cellpadding="0" cellspacing="0">
   <tr>
     <td>
-      <div class="sig-name">____________________________</div>
-      <div class="sig-role">Coordinadora</div>
+      <div class="sig-name">{{ (firma_boleta.coordinador if firma_boleta else '') or '____________________________' }}</div>
+      <div class="sig-role">{{ firma_coord_label|default('COORDINADORA') }}</div>
     </td>
     <td>
-      <div class="sig-name">Lic. Glicerio Palacios Contreras</div>
+      <div class="sig-name">{{ firma_boleta.director if firma_boleta else 'Lic. Glicerio Palacios Contreras' }}</div>
       <div class="sig-role">Director General</div>
     </td>
     <td>
-      <div class="sig-name">____________________________</div>
+      <div class="sig-name">{{ (firma_boleta.tutor if firma_boleta else '') or '____________________________' }}</div>
       <div class="sig-role">Tutor de Aula</div>
     </td>
   </tr>

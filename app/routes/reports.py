@@ -8,7 +8,7 @@ from app.services.pdf_service_inicial import generate_boleta_inicial_pdf, genera
 from app.utils.id_mask import encode_id, decode_id
 from app.models.student import Student
 from app.models.academic import (
-    Course, Term, Grade, EDA, EdaGrade, EdaComment,
+    Term, EDA, EdaGrade, EdaComment,
     INDICADORES_CONDUCTA, INDICADORES_CONDUCTA_SECUNDARIA,
     INDICADORES_PPFF, INDICADORES_PPFF_SECUNDARIA, MESES,
 )
@@ -24,77 +24,25 @@ from app.services.parent_service import (
 from app.models.user import User
 from app.security.permissions import assert_can_view_student
 from app import render, flash, redirect_to
+from app.services.boleta_staff_service import (
+    get_staff_map,
+    firma_boleta_for_student,
+    firma_coord_label_for_nivel,
+)
 import datetime
 
 router = APIRouter(tags=["reports"])
 
 
-# ── Helpers de ranking ────────────────────────────────────────────────────────
-
-def _dense_rank(student_id: int, avgs: dict) -> int | None:
-    sorted_ids = sorted(avgs, key=lambda s: avgs[s], reverse=True)
-    rank, prev = 1, None
-    for sid in sorted_ids:
-        if prev is not None and avgs[sid] != prev:
-            rank += 1
-        if sid == student_id:
-            return rank
-        prev = avgs[sid]
-    return None
-
-
-def _term_merit(student_id, nivel, grado, seccion, term_id, course_ids):
-    st_ids = [s.id for s in Student.query.filter_by(
-        nivel=nivel, grado=grado, seccion=seccion, estado="ACTIVO"
-    ).with_entities(Student.id).all()]
-    rows = Grade.query.filter(
-        Grade.student_id.in_(st_ids), Grade.term_id == term_id,
-        Grade.course_id.in_(course_ids),
-    ).all()
-    grade_map: dict[int, list] = {}
-    for g in rows:
-        if g.numeric_value is not None:
-            grade_map.setdefault(g.student_id, []).append(g.numeric_value)
-    avgs = {sid: round(sum(v) / len(v)) for sid, v in grade_map.items()}
-    return _dense_rank(student_id, avgs)
-
-
-def _annual_merit(student_id, nivel, grado, seccion, anio, course_ids):
-    st_ids = [s.id for s in Student.query.filter_by(
-        nivel=nivel, grado=grado, seccion=seccion, estado="ACTIVO"
-    ).with_entities(Student.id).all()]
-    term_ids = [t.id for t in Term.query.filter_by(anio=anio).all()]
-    rows = Grade.query.filter(
-        Grade.student_id.in_(st_ids), Grade.term_id.in_(term_ids),
-        Grade.course_id.in_(course_ids),
-    ).all()
-    st_course: dict[int, dict[int, list]] = {}
-    for g in rows:
-        if g.numeric_value is not None:
-            st_course.setdefault(g.student_id, {}).setdefault(g.course_id, []).append(g.numeric_value)
-    avgs: dict[int, int] = {}
-    for sid in st_ids:
-        course_avgs = [round(sum(v) / len(v)) for v in st_course.get(sid, {}).values()]
-        if course_avgs:
-            avgs[sid] = round(sum(course_avgs) / len(course_avgs))
-    return _dense_rank(student_id, avgs)
-
-
 # ── Contexto principal ────────────────────────────────────────────────────────
 
-def _build_boleta_context(student_id: int, anio: int) -> dict:
+def _build_boleta_context(student_id: int, anio: int, staff_map: dict | None = None) -> dict:
     student = Student.query.get(student_id)
     if not student:
         raise HTTPException(status_code=404)
     matrix, terms = get_student_grades_matrix(student_id, anio)
     attendance_list = get_student_attendance(student_id, anio)
     behavior = get_student_behavior(student_id, anio)
-
-    courses = Course.query.filter(
-        Course.nivel == student.nivel,
-        (Course.grado == student.grado) | (Course.grado.is_(None))
-    ).all()
-    course_ids = [c.id for c in courses]
 
     eda_data: dict = {}
     for term in terms:
@@ -103,12 +51,6 @@ def _build_boleta_context(student_id: int, anio: int) -> dict:
         for eda in edas:
             eg_list = EdaGrade.query.filter_by(student_id=student_id, eda_id=eda.id).all()
             eda_data[term.id][eda.orden] = {eg.course_id: eg.numeric_value for eg in eg_list}
-
-    merit_per_term = {
-        t.id: _term_merit(student_id, student.nivel, student.grado, student.seccion, t.id, course_ids)
-        for t in terms
-    }
-    merit_final = _annual_merit(student_id, student.nivel, student.grado, student.seccion, anio, course_ids)
 
     att_by_month = {a.mes: a for a in attendance_list}
     total_faltas = sum(a.faltas for a in attendance_list)
@@ -138,10 +80,12 @@ def _build_boleta_context(student_id: int, anio: int) -> dict:
     ppff_avg = get_ppff_average(student_id, anio, student.nivel)
     ppff_ind_avgs = get_ppff_indicator_averages(student_id, anio, student.nivel)
 
+    if staff_map is None:
+        staff_map = get_staff_map()
+
     return {
         "student": student, "matrix": matrix, "terms": terms,
-        "eda_data": eda_data, "merit_per_term": merit_per_term,
-        "merit_final": merit_final, "att_by_month": att_by_month,
+        "eda_data": eda_data, "att_by_month": att_by_month,
         "total_faltas": total_faltas, "total_tardanzas": total_tardanzas,
         "behavior": behavior, "behavior_by_term": behavior_by_term,
         "behavior_promedio": behavior_avg, "behavior_ind_avgs": behavior_ind_avgs,
@@ -150,6 +94,8 @@ def _build_boleta_context(student_id: int, anio: int) -> dict:
         "ppff_ind_avgs": ppff_ind_avgs, "meses": MESES,
         "comments_per_term": comments_per_term, "promedio_anual": promedio_anual,
         "anio": anio, "fecha_emision": datetime.date.today().strftime("%d/%m/%Y"),
+        "firma_boleta": firma_boleta_for_student(student, staff_map),
+        "firma_coord_label": firma_coord_label_for_nivel(student.nivel),
     }
 
 
@@ -248,12 +194,13 @@ async def boletas_masivas(request: Request, current_user: User = Depends(require
         flash(request, "No se encontraron estudiantes activos con los filtros seleccionados.", "warning")
         return redirect_to(f"/reports/boletas-masivas?anio={anio}&grado={grado}&seccion={seccion}")
 
+    staff_map = get_staff_map()
     ctx_list = []
     for s in students:
         if s.nivel == "SECUNDARIA":
-            ctx_list.append(_build_boleta_context_secundaria(s.id, anio))
+            ctx_list.append(_build_boleta_context_secundaria(s.id, anio, staff_map))
         else:
-            ctx_list.append(_build_boleta_context(s.id, anio))
+            ctx_list.append(_build_boleta_context(s.id, anio, staff_map))
 
     ini_ctxs = [c for c, s in zip(ctx_list, students) if s.nivel == "INICIAL"]
     prim_ctxs = [c for c, s in zip(ctx_list, students) if s.nivel == "PRIMARIA"]
@@ -295,8 +242,8 @@ async def boletas_masivas(request: Request, current_user: User = Depends(require
 
 # ── Boleta SECUNDARIA ──────────────────────────────────────────────────────────
 
-def _build_boleta_context_secundaria(student_id: int, anio: int) -> dict:
-    ctx = _build_boleta_context(student_id, anio)
+def _build_boleta_context_secundaria(student_id: int, anio: int, staff_map: dict | None = None) -> dict:
+    ctx = _build_boleta_context(student_id, anio, staff_map)
     ctx["indicadores"] = INDICADORES_CONDUCTA_SECUNDARIA
     ctx["behavior_ind_avgs"] = get_behavior_indicator_averages(
         student_id, anio, INDICADORES_CONDUCTA_SECUNDARIA, ctx["student"].nivel

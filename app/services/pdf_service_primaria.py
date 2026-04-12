@@ -5,6 +5,8 @@ Todas las dimensiones en milímetros. Ancho útil A4 = 190 mm.
 """
 from fpdf import FPDF
 
+from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
+
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 BRAND       = (14,  47, 119)   # #0e2f77
 BIM_BLUE    = (68, 114, 196)   # #4472c4
@@ -293,8 +295,6 @@ class BoletaPrimariaPDF(FPDF):
         matrix   = ctx['matrix']
         terms    = ctx['terms']
         eda_data = ctx['eda_data']
-        merit_pt = ctx['merit_per_term']
-        merit_f  = ctx['merit_final']
         # Seleccionar layout según grado del estudiante
         grado = str(ctx['student'].grado) if ctx.get('student') else "6"
         boleta_layout = BOLETA_LAYOUT_PRIMARIA.get(grado, BOLETA_LAYOUT)
@@ -374,17 +374,6 @@ class BoletaPrimariaPDF(FPDF):
                     self._draw_course_grades_row(cid, data, terms, eda_data)
                 self.set_xy(ML, y_area + area_h)
 
-        # ── Fila Orden de Mérito ─────────────────────────────────────────────
-        bim_short = ['IB', 'IIB', 'IIIB', 'IVB']
-        self._hcell(AW + CW, RH, 'Orden de Merito', size=8)
-        for i, term in enumerate(terms):
-            r = merit_pt.get(term.id)
-            label = bim_short[i] if i < 4 else ''
-            self._hcell(P1W + P2W, RH, label, size=7.5)
-            self._hcell(PMW + QW, RH, f'{r}' if r else '-', size=8)
-        self._hcell(PFW, RH, 'PF', size=7.5)
-        self._hcell(NLW, RH, f'{merit_f}' if merit_f else '-', size=7,
-                    nx='LMARGIN', ny='NEXT')
         self.ln(1.5)
 
     def _draw_course_grades_row(self, cid, data, terms, eda_data):
@@ -689,23 +678,32 @@ class BoletaPrimariaPDF(FPDF):
         self.ln(17)
 
     # ──────────────────────────────────────────────────────────────────────────
-    def _signatures(self):
-        sw = PW / 3
-        self.ln(4)
-        sigs = [
-            ('____________________________',          'COORDINADORA'),
-            ('Lic. Glicerio Palacios Contreras',      'DIRECTOR GENERAL'),
-            ('____________________________',          'TUTOR DE AULA'),
-        ]
-        self.set_font('Helvetica', 'B', 8)
+    def _sig_line(self, sw: float, text: str, placeholder: str) -> None:
+        disp = text.strip() if text and text.strip() else placeholder
+        n = len(disp)
+        fs = 8 if n < 26 else (7 if n < 40 else 6)
+        self.set_font('Helvetica', 'B', fs)
         self._tc(BLACK)
-        for name, _ in sigs:
-            self.cell(sw, 4, name, align='C', new_x='RIGHT', new_y='LAST')
+        self.cell(sw, 4, self._safe(disp[:90]), align='C', new_x='RIGHT', new_y='LAST')
+
+    def _signatures(self, ctx: dict):
+        sw = PW / 3
+        line = "____________________________"
+        fb = ctx.get("firma_boleta") or {}
+        coord = (fb.get("coordinador") or "").strip()
+        tutor = (fb.get("tutor") or "").strip()
+        st = ctx["student"]
+        coord_lbl = "COORDINADOR(A)" if st.nivel == "SECUNDARIA" else "COORDINADORA"
+        self.ln(4)
+        self.set_x(ML)
+        self._sig_line(sw, coord, line)
+        self._sig_line(sw, (fb.get("director") or "").strip() or DEFAULT_DIRECTOR_GENERAL, line)
+        self._sig_line(sw, tutor, line)
         self.set_x(ML); self.set_y(self.get_y() + 4)
 
         self.set_font('Helvetica', 'B', 7.5)
         self._tc(BRAND)
-        for _, role in sigs:
+        for role in (coord_lbl, "DIRECTOR GENERAL", "TUTOR DE AULA"):
             self.cell(sw, 4, role, align='C', new_x='RIGHT', new_y='LAST')
         self._reset()
         self.set_x(ML); self.set_y(self.get_y() + 4)
@@ -736,7 +734,7 @@ class BoletaPrimariaPDF(FPDF):
         self._scale_attendance(ctx)
         self._behavior_ppff_row(ctx)
         self._comments(ctx)
-        self._signatures()
+        self._signatures(ctx)
         self._footer_bar(ctx['anio'], ctx['fecha_emision'])
 
     def build(self, ctx: dict) -> bytes:

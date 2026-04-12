@@ -22,6 +22,13 @@ from app.models.academic import (
     RegistroSemana, RegistroExamen, ParentResponsibility,
 )
 from app.services.grade_service import numeric_to_qualitative, upsert_grade
+from app.services.excel_import_teachers import (
+    import_teachers_from_excel,
+    generate_teachers_template_excel,
+    _cell_to_str,
+    _parse_course_ids,
+    _grados_validos,
+)
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────
@@ -523,3 +530,558 @@ class TestSecurityHardening:
         token = encode_id(s2.id)
         resp = client.get(f"/grades/student/{token}")
         assert resp.status_code == 403
+
+
+# ─── 10. Helpers: generador de Excel en memoria ─────────────────────
+
+def _make_teachers_xlsx(rows):
+    """
+    Crea un .xlsx en BytesIO a partir de una lista de listas.
+    Primera lista = cabecera, siguientes = filas de datos.
+    """
+    import openpyxl
+    from io import BytesIO
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    for row in rows:
+        ws.append(row)
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def _xlsx_bytes(rows) -> bytes:
+    return _make_teachers_xlsx(rows).read()
+
+
+# ─── 11. Tests de funciones puras del servicio ──────────────────────
+
+class TestCellToStr:
+    def test_none(self):
+        assert _cell_to_str(None) == ""
+
+    def test_string(self):
+        assert _cell_to_str("  hello ") == "hello"
+
+    def test_int(self):
+        assert _cell_to_str(3) == "3"
+
+    def test_float_whole(self):
+        assert _cell_to_str(3.0) == "3"
+
+    def test_float_fractional(self):
+        result = _cell_to_str(3.5)
+        assert "3.5" in result
+
+    def test_bool_true(self):
+        assert _cell_to_str(True) in ("True", "1")
+
+    def test_bool_false(self):
+        assert _cell_to_str(False) in ("False", "0")
+
+
+class TestParseCourseIds:
+    def test_empty_string(self):
+        ids, bad = _parse_course_ids("")
+        assert ids == []
+        assert bad == []
+
+    def test_none(self):
+        ids, bad = _parse_course_ids(None)
+        assert ids == []
+
+    def test_single_id(self):
+        ids, bad = _parse_course_ids("5")
+        assert ids == [5]
+        assert bad == []
+
+    def test_comma_separated(self):
+        ids, _ = _parse_course_ids("1,2,3")
+        assert ids == [1, 2, 3]
+
+    def test_semicolon_separated(self):
+        ids, _ = _parse_course_ids("1;2;3")
+        assert ids == [1, 2, 3]
+
+    def test_spaces(self):
+        ids, _ = _parse_course_ids("  1 , 2 , 3  ")
+        assert ids == [1, 2, 3]
+
+    def test_whitespace_only(self):
+        ids, _ = _parse_course_ids("   ")
+        assert ids == []
+
+    def test_float_as_string_reported(self):
+        ids, bad = _parse_course_ids("5.0")
+        assert bad == ["5.0"], "Decimal notation is not a valid integer"
+
+    def test_duplicate_ids_deduplicated(self):
+        """Duplicate IDs must be deduplicated to avoid IntegrityError
+        on TeacherCourse unique constraint."""
+        ids, _ = _parse_course_ids("1,1,2")
+        assert ids == [1, 2]
+
+    def test_non_numeric_reported(self):
+        """Non-numeric tokens must be returned in the bad list, not silently dropped."""
+        ids, bad = _parse_course_ids("1,abc,3")
+        assert ids == [1, 3]
+        assert bad == ["abc"]
+
+
+class TestGradosValidos:
+    def test_inicial(self):
+        assert _grados_validos("INICIAL") == {"3", "4", "5"}
+
+    def test_primaria(self):
+        assert _grados_validos("PRIMARIA") == {"1", "2", "3", "4", "5", "6"}
+
+    def test_secundaria(self):
+        assert _grados_validos("SECUNDARIA") == {"1", "2", "3", "4", "5"}
+
+    def test_unknown(self):
+        assert _grados_validos("JARDIN") == set()
+
+
+# ─── 12. Tests del servicio de importación de docentes ───────────────
+
+class TestImportTeachersService:
+
+    def test_happy_path_minimal(self, app, seed):
+        """Importar un docente con solo columnas obligatorias."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.test", "Profesor de Prueba"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+        assert len(result["errores"]) == 0
+        user = User.query.filter_by(username="profe.test").first()
+        assert user is not None
+        assert user.role == RoleEnum.DOCENTE
+        assert user.is_active is True
+
+    def test_happy_path_full_columns(self, app, seed):
+        """Importar docente con todas las columnas, incluidos cursos."""
+        cid = seed["course_id"]
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "PASSWORD", "NIVEL", "GRADO", "IDS_CURSOS"],
+            ["profe.full", "Prof Completo", "MiClave123", "PRIMARIA", "3", str(cid)],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+        assert len(result["errores"]) == 0
+        user = User.query.filter_by(username="profe.full").first()
+        assert user.check_password("MiClave123")
+        assert user.nivel == "PRIMARIA"
+        assert user.grado == "3"
+        tc = TeacherCourse.query.filter_by(user_id=user.id, course_id=cid).first()
+        assert tc is not None
+
+    def test_password_auto_generated(self, app, seed):
+        """Si PASSWORD está vacío, se genera automáticamente."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "PASSWORD"],
+            ["profe.auto", "Prof Auto", ""],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+        detalle = result["detalle"][0]
+        assert detalle["password_es_temporal"] is True
+        pwd = detalle["password_nota"]
+        user = User.query.filter_by(username="profe.auto").first()
+        assert user.check_password(pwd), "Auto-generated password must work"
+
+    def test_password_from_file(self, app, seed):
+        """Si PASSWORD tiene valor, se usa esa y no se muestra en detalle."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "PASSWORD"],
+            ["profe.pwd", "Prof Pwd", "SecretPass99"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+        detalle = result["detalle"][0]
+        assert detalle["password_es_temporal"] is False
+        assert detalle["password_nota"] == "La indicada en el Excel"
+
+    def test_multiple_rows(self, app, seed):
+        """Importar varios docentes de una vez."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.a", "Profesor A"],
+            ["profe.b", "Profesor B"],
+            ["profe.c", "Profesor C"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 3
+        assert len(result["errores"]) == 0
+
+    def test_empty_rows_skipped(self, app, seed):
+        """Filas vacías no generan errores."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.ok", "Profesor OK"],
+            [None, None],
+            ["", ""],
+            ["profe.ok2", "Profesor OK2"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 2
+        assert len(result["errores"]) == 0
+
+    def test_missing_required_columns_raises(self, app, seed):
+        """Excel sin columnas obligatorias lanza ValueError."""
+        buf = _make_teachers_xlsx([
+            ["FOO", "BAR"],
+            ["x", "y"],
+        ])
+        with pytest.raises(ValueError, match="Faltan columnas obligatorias"):
+            import_teachers_from_excel(buf)
+
+    def test_empty_excel_raises(self, app, seed):
+        buf = _make_teachers_xlsx([])
+        with pytest.raises(ValueError, match="vacío"):
+            import_teachers_from_excel(buf)
+
+    def test_usuario_vacio(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["", "Prof sin usuario"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert len(result["errores"]) == 1
+        assert "vacío" in result["errores"][0]["motivo"].lower()
+
+    def test_nombre_vacio(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.test", ""],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert len(result["errores"]) == 1
+        assert "NOMBRE_COMPLETO" in result["errores"][0]["motivo"]
+
+    def test_invalid_username_short(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["ab", "Prof Corto"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert len(result["errores"]) == 1
+        assert "inválido" in result["errores"][0]["motivo"].lower()
+
+    def test_invalid_username_special_chars(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe @#$", "Prof Especial"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert len(result["errores"]) == 1
+
+    def test_duplicate_username_in_db(self, app, seed):
+        """Username que ya existe en BD genera error."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["docente", "Duplicado del docente seed"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert len(result["errores"]) == 1
+        assert "ya existe" in result["errores"][0]["motivo"]
+
+    def test_duplicate_username_within_same_file(self, app, seed):
+        """Mismo username en dos filas: primera OK, segunda error."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.dup", "Primera Vez"],
+            ["profe.dup", "Segunda Vez"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+        assert len(result["errores"]) == 1
+        assert "ya existe" in result["errores"][0]["motivo"]
+
+    def test_invalid_nivel(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "NIVEL"],
+            ["profe.mal", "Prof Mal Nivel", "UNIVERSIDAD"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert "inválido" in result["errores"][0]["motivo"].lower()
+
+    def test_grado_without_nivel_rejected(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "NIVEL", "GRADO"],
+            ["profe.nogr", "Prof Solo Grado", "", "3"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert "NIVEL" in result["errores"][0]["motivo"]
+
+    def test_invalid_grado_for_nivel(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "NIVEL", "GRADO"],
+            ["profe.bad", "Prof Grado 6 Inicial", "INICIAL", "6"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert "GRADO" in result["errores"][0]["motivo"]
+
+    def test_nivel_without_grado_is_ok(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "NIVEL", "GRADO"],
+            ["profe.niv", "Prof Solo Nivel", "SECUNDARIA", ""],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+        user = User.query.filter_by(username="profe.niv").first()
+        assert user.nivel == "SECUNDARIA"
+        assert user.grado is None
+
+    def test_nonexistent_course_ids(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "IDS_CURSOS"],
+            ["profe.bad", "Prof Bad Course", "99999"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0
+        assert "inexistentes" in result["errores"][0]["motivo"]
+
+    def test_mixed_valid_and_invalid_rows(self, app, seed):
+        """Verifica que filas válidas se importan y las inválidas generan errores,
+        sin que un error en fila N corrompa la fila N+1."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.ok1", "Profesor Bueno 1"],
+            ["ab", "Nombre Corto Usuario"],
+            ["profe.ok2", "Profesor Bueno 2"],
+            ["docente", "Duplicado seed"],
+            ["profe.ok3", "Profesor Bueno 3"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 3
+        assert len(result["errores"]) == 2
+
+    def test_error_after_duplicate_does_not_corrupt_session(self, app, seed):
+        """BUG FINDER: after IntegrityError + rollback for a duplicate username,
+        subsequent valid rows must still be importable. A broken session would
+        cause all remaining rows to fail."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["docente", "Duplicado del seed"],
+            ["profe.afterdup", "Profesor Post-Dup"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1, "Row after IntegrityError must succeed"
+        assert len(result["errores"]) == 1
+
+    # ── BUG: IDs de curso duplicados ──────────────────────────────────
+
+    def test_duplicate_course_ids_in_excel(self, app, seed):
+        """BUG FINDER: IDS_CURSOS = '1,1' with real course ID should NOT
+        cause IntegrityError on uq_teacher_course."""
+        cid = seed["course_id"]
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "IDS_CURSOS"],
+            ["profe.dups", "Prof Dup Cursos", f"{cid},{cid}"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1, (
+            "Duplicate course IDs should be deduplicated, not crash"
+        )
+        assert len(result["errores"]) == 0
+        tc_count = TeacherCourse.query.filter_by(
+            user_id=User.query.filter_by(username="profe.dups").first().id
+        ).count()
+        assert tc_count == 1, "Only one TeacherCourse per course"
+
+    # ── BUG: IDs no numéricos se descartan sin avisar ────────────────
+
+    def test_non_numeric_course_ids_reported_as_error(self, app, seed):
+        """IDS_CURSOS with garbage like 'abc' must produce an error row,
+        not silently drop the invalid token."""
+        cid = seed["course_id"]
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "IDS_CURSOS"],
+            ["profe.bad", "Prof Bad Ids", f"{cid},abc"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 0, "Row with invalid course IDs should not be imported"
+        assert len(result["errores"]) == 1
+        assert "abc" in result["errores"][0]["motivo"]
+
+    # ── Grado como número en Excel (openpyxl devuelve int) ───────────
+
+    def test_grado_as_integer_from_excel(self, app, seed):
+        """openpyxl devuelve celdas numéricas como int/float, no str.
+        El grado '3' llega como int 3 — debe convertirse correctamente."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "NIVEL", "GRADO"],
+            ["profe.int", "Prof Int Grado", "PRIMARIA", 3],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1, f"Errors: {result['errores']}"
+        user = User.query.filter_by(username="profe.int").first()
+        assert user.grado == "3"
+
+    def test_course_ids_as_integer_from_excel(self, app, seed):
+        """openpyxl puede devolver IDS_CURSOS como int si solo hay un ID."""
+        cid = seed["course_id"]
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE_COMPLETO", "IDS_CURSOS"],
+            ["profe.intid", "Prof Int ID", cid],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1, f"Errors: {result['errores']}"
+
+    # ── Cabeceras case-insensitive y con espacios ─────────────────────
+
+    def test_headers_case_insensitive(self, app, seed):
+        buf = _make_teachers_xlsx([
+            ["usuario", "nombre_completo"],
+            ["profe.low", "Prof Lower Case Headers"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+
+    def test_headers_with_spaces(self, app, seed):
+        """Cabecera 'NOMBRE COMPLETO' (con espacio) se normaliza a NOMBRE_COMPLETO."""
+        buf = _make_teachers_xlsx([
+            ["USUARIO", "NOMBRE COMPLETO"],
+            ["profe.spc", "Prof Spaces"],
+        ])
+        result = import_teachers_from_excel(buf)
+        assert result["creados"] == 1
+
+    # ── Template Excel generation ─────────────────────────────────────
+
+    def test_template_generates_valid_xlsx(self, app, seed):
+        buf = generate_teachers_template_excel()
+        assert buf.read(2) == b"PK", "Must be valid .xlsx (ZIP)"
+
+    def test_template_has_correct_sheets(self, app, seed):
+        import openpyxl
+        buf = generate_teachers_template_excel()
+        wb = openpyxl.load_workbook(buf)
+        names = wb.sheetnames
+        assert "Docentes" in names
+        assert "Cursos_ID" in names
+        assert "Instrucciones" in names
+
+    def test_template_headers_match_service_columns(self, app, seed):
+        import openpyxl
+        from app.services.excel_import_teachers import COLUMNAS
+        buf = generate_teachers_template_excel()
+        wb = openpyxl.load_workbook(buf)
+        ws = wb["Docentes"]
+        headers = [cell.value for cell in ws[1]]
+        assert headers == COLUMNAS
+
+    def test_template_catalog_includes_courses(self, app, seed):
+        """La hoja Cursos_ID debe listar los cursos del sistema."""
+        import openpyxl
+        buf = generate_teachers_template_excel()
+        wb = openpyxl.load_workbook(buf)
+        ws = wb["Cursos_ID"]
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+        course_ids = [r[0] for r in rows]
+        assert seed["course_id"] in course_ids
+
+
+# ─── 13. Tests HTTP de rutas de importación de docentes ──────────────
+
+class TestTeacherImportRoutes:
+
+    def _csrf_headers(self, client):
+        """Get CSRF token from users page (must be logged in first)."""
+        page = client.get("/admin/users")
+        m = re.search(r'name="csrf_token"\s+value="([^"]+)"', page.text)
+        token = m.group(1) if m else ""
+        return {"X-CSRFToken": token}
+
+    def test_users_page_shows_import_section(self, client, seed):
+        login(client, "admin", "admin1234")
+        resp = client.get("/admin/users")
+        assert resp.status_code == 200
+        assert "importar-docentes" in resp.text.lower() or "Importar docentes" in resp.text
+
+    def test_download_template_requires_admin(self, client, seed):
+        login(client, "docente", "docente1234")
+        resp = client.get("/admin/users/plantilla-docentes", follow_redirects=False)
+        assert resp.status_code in (303, 403)
+
+    def test_download_template_as_admin(self, client, seed):
+        login(client, "admin", "admin1234")
+        resp = client.get("/admin/users/plantilla-docentes")
+        assert resp.status_code == 200
+        ct = resp.headers.get("content-type", "")
+        assert "spreadsheetml" in ct or "application/" in ct
+        assert resp.content[:2] == b"PK"
+
+    def test_import_requires_admin(self, client, seed):
+        login(client, "docente", "docente1234")
+        resp = client.post(
+            "/admin/users/importar-docentes",
+            files={"excel_file": ("test.xlsx", b"PK fake", "application/octet-stream")},
+            follow_redirects=False,
+        )
+        assert resp.status_code in (303, 403)
+
+    def test_import_rejects_non_xlsx(self, client, seed):
+        login(client, "admin", "admin1234")
+        hdrs = self._csrf_headers(client)
+        resp = client.post(
+            "/admin/users/importar-docentes",
+            files={"excel_file": ("test.csv", b"a,b,c", "text/csv")},
+            headers=hdrs,
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert ".xlsx" in resp.text
+
+    def test_import_rejects_fake_xlsx(self, client, seed):
+        """File with .xlsx extension but non-ZIP content."""
+        login(client, "admin", "admin1234")
+        hdrs = self._csrf_headers(client)
+        resp = client.post(
+            "/admin/users/importar-docentes",
+            files={"excel_file": ("test.xlsx", b"NOT A ZIP FILE", "application/octet-stream")},
+            headers=hdrs,
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "no parece" in resp.text or "válido" in resp.text
+
+    def test_import_valid_xlsx_creates_users(self, client, seed):
+        login(client, "admin", "admin1234")
+        hdrs = self._csrf_headers(client)
+        xlsx = _xlsx_bytes([
+            ["USUARIO", "NOMBRE_COMPLETO"],
+            ["profe.http", "Prof HTTP Test"],
+        ])
+        resp = client.post(
+            "/admin/users/importar-docentes",
+            files={"excel_file": ("docentes.xlsx", xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=hdrs,
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "Resultado" in resp.text or "creados" in resp.text.lower() or "Docentes creados" in resp.text
+        user = User.query.filter_by(username="profe.http").first()
+        assert user is not None
+
+    def test_import_no_file_redirects(self, client, seed):
+        login(client, "admin", "admin1234")
+        hdrs = self._csrf_headers(client)
+        resp = client.post(
+            "/admin/users/importar-docentes",
+            data={},
+            headers=hdrs,
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200

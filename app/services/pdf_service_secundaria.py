@@ -10,6 +10,8 @@ Dimensiones en mm. Ancho útil A4 = 190 mm.
 from collections import OrderedDict
 from fpdf import FPDF
 
+from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
+
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 BRAND       = (14,  47, 119)
 BIM_BLUE    = (68, 114, 196)
@@ -263,9 +265,6 @@ class BoletaSecundariaPDF(FPDF):
         matrix    = ctx['matrix']
         terms     = ctx['terms']
         eda_data  = ctx['eda_data']
-        merit_pt  = ctx['merit_per_term']
-        merit_f   = ctx['merit_final']
-
         bim_names = ['I BIMESTRE', 'II BIMESTRE', 'III BIMESTRE', 'IV BIMESTRE']
 
         # ── Agrupar cursos por área (preservando orden) ──────────────────
@@ -365,20 +364,6 @@ class BoletaSecundariaPDF(FPDF):
             # Mover Y al final del grupo
             self.set_y(y_area + area_height)
 
-        # ── Fila Orden de Mérito ─────────────────────────────────────────
-        self.ln(0.3)
-        bim_short = ['IB', 'IIB', 'IIIB', 'IVB']
-        self._hcell(AW + CW, RH, 'Orden de Mérito', size=9)
-        for i, term in enumerate(terms):
-            r = merit_pt.get(term.id)
-            label = bim_short[i] if i < 4 else ''
-            self._hcell(P1W + P2W, RH, label, size=7.5, bg=BIM_BLUE)
-            self._hcell(PMW, RH, f'{r}°' if r else '-', size=9,
-                        bg=SUB_BLUE, fg=BLACK)
-        self._hcell(PFW, RH, '', size=7.5, bg=BIM_BLUE)
-        self._hcell(NLW, RH, f'{merit_f}°' if merit_f else '-',
-                    size=7, bg=SUB_BLUE, fg=BLACK,
-                    nx='LMARGIN', ny='NEXT')
         self.ln(1.5)
 
     # =====================================================================
@@ -668,23 +653,30 @@ class BoletaSecundariaPDF(FPDF):
     # =====================================================================
     # FIRMAS
     # =====================================================================
-    def _signatures(self):
-        sw = PW / 3
-        self.ln(4)
-        sigs = [
-            ('____________________________', 'COORDINADOR(A)'),
-            ('Lic. Glicerio Palacios Contreras', 'DIRECTOR GENERAL'),
-            ('____________________________', 'TUTOR DE AULA'),
-        ]
-        self.set_font('Helvetica', 'B', 8)
+    def _sig_line(self, sw: float, text: str, placeholder: str) -> None:
+        disp = text.strip() if text and text.strip() else placeholder
+        n = len(disp)
+        fs = 8 if n < 26 else (7 if n < 40 else 6)
+        self.set_font('Helvetica', 'B', fs)
         self._tc(BLACK)
-        for name, _ in sigs:
-            self.cell(sw, 4, name, align='C', new_x='RIGHT', new_y='LAST')
+        self.cell(sw, 4, self._safe(disp[:90]), align='C', new_x='RIGHT', new_y='LAST')
+
+    def _signatures(self, ctx: dict):
+        sw = PW / 3
+        line = "____________________________"
+        fb = ctx.get("firma_boleta") or {}
+        coord = (fb.get("coordinador") or "").strip()
+        tutor = (fb.get("tutor") or "").strip()
+        self.ln(4)
+        self.set_x(ML)
+        self._sig_line(sw, coord, line)
+        self._sig_line(sw, (fb.get("director") or "").strip() or DEFAULT_DIRECTOR_GENERAL, line)
+        self._sig_line(sw, tutor, line)
         self.set_x(ML); self.set_y(self.get_y() + 4)
 
         self.set_font('Helvetica', 'B', 7.5)
         self._tc(BRAND)
-        for _, role in sigs:
+        for role in ("COORDINADOR(A)", "DIRECTOR GENERAL", "TUTOR DE AULA"):
             self.cell(sw, 4, role, align='C', new_x='RIGHT', new_y='LAST')
         self._reset()
         self.set_x(ML); self.set_y(self.get_y() + 4)
@@ -719,7 +711,7 @@ class BoletaSecundariaPDF(FPDF):
         self._scale_attendance(ctx)
         self._behavior_ppff_row(ctx)
         self._comments(ctx)
-        self._signatures()
+        self._signatures(ctx)
         self._footer_line(ctx['anio'], ctx['fecha_emision'])
 
     def build(self, ctx: dict) -> bytes:

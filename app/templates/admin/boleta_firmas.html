@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Firmas en boletas{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('admin.users') }}" class="text-brand hover:underline text-sm flex items-center gap-1">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Admin
+  </a>
+  <div class="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+    <svg class="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-brand">Firmas en boletas</h1>
+    <p class="text-sm text-gray-500">Coordinadores, director(a) general, y tutores de aula por grado (PDF y vista previa).</p>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('admin.boleta_firmas_post') }}" class="space-y-8 max-w-4xl">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+    <h2 class="text-lg font-bold text-brand mb-4">Coordinadores</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Coordinador(a) — Primaria e Inicial</label>
+        <input type="text" name="coord_primaria" value="{{ staff.get('coord_primaria', '') }}"
+               maxlength="200"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"
+               placeholder="Nombre y apellidos"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Coordinador(a) — Secundaria</label>
+        <input type="text" name="coord_secundaria" value="{{ staff.get('coord_secundaria', '') }}"
+               maxlength="200"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"
+               placeholder="Nombre y apellidos"/>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Director(a) general</label>
+        <input type="text" name="director_general" value="{{ staff.get('director_general', '') }}"
+               maxlength="200"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"
+               placeholder="Lic. Glicerio Palacios Contreras"/>
+        <p class="text-xs text-gray-500 mt-1">Aparece en el centro de las firmas de todas las boletas. Si lo dejas vacío, se usa el nombre por defecto del colegio.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+    <h2 class="text-lg font-bold text-brand mb-2">Tutores de aula — Inicial</h2>
+    <p class="text-xs text-gray-500 mb-4">Grados 3°, 4° y 5° de educación inicial.</p>
+    <div class="grid sm:grid-cols-3 gap-4">
+      {% for g in grados_inicial %}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ g }}° Inicial</label>
+        <input type="text" name="tutor_inicial_{{ g }}" value="{{ staff.get('tutor_inicial_' ~ g, '') }}"
+               maxlength="200"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"/>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+    <h2 class="text-lg font-bold text-brand mb-4">Tutores de aula — Primaria</h2>
+    <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {% for g in grados_primaria %}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ g }}° Primaria</label>
+        <input type="text" name="tutor_primaria_{{ g }}" value="{{ staff.get('tutor_primaria_' ~ g, '') }}"
+               maxlength="200"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"/>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+    <h2 class="text-lg font-bold text-brand mb-4">Tutores de aula — Secundaria</h2>
+    <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {% for g in grados_secundaria %}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ g }}° Secundaria</label>
+        <input type="text" name="tutor_secundaria_{{ g }}" value="{{ staff.get('tutor_secundaria_' ~ g, '') }}"
+               maxlength="200"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"/>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="flex gap-3">
+    <button type="submit"
+            class="bg-brand text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-light transition">
+      Guardar cambios
+    </button>
+  </div>
+</form>
+{% endblock %}

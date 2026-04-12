@@ -1,6 +1,8 @@
+import io
+
 from pydantic import ValidationError
-from fastapi import APIRouter, Request, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, Depends, File, UploadFile
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import IntegrityError
 from app.auth.dependencies import require_role
 from app.database import db
@@ -8,7 +10,13 @@ from app.schemas.json_payloads import AdminCourseSavePayload
 from app.utils.safe_errors import log_unexpected_exc, GENERIC_FLASH_MESSAGE, GENERIC_USER_MESSAGE
 from app.models.user import User, RoleEnum, TeacherCourse
 from app.models.academic import Course, Term, EDA, AREAS
-from app.models.student import GRADOS, NIVELES
+from app.services.boleta_staff_service import get_staff_map, upsert_staff_map, all_boleta_staff_keys
+from app.services.excel_import_teachers import (
+    import_teachers_from_excel,
+    generate_teachers_template_excel,
+    MAX_EXCEL_BYTES as _TEACHERS_EXCEL_MAX_BYTES,
+)
+from app.models.student import GRADOS, NIVELES, GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
 from app import render, flash, redirect_to
 import datetime
 
@@ -126,6 +134,58 @@ async def edit_user_submit(user_id: int, request: Request, current_user: User = 
                   grados_map={"INICIAL": GRADOS_INICIAL, "PRIMARIA": GRADOS_PRIMARIA, "SECUNDARIA": GRADOS_SECUNDARIA})
 
 
+@router.get("/users/plantilla-docentes", name="admin.download_teachers_template")
+async def download_teachers_template(current_user: User = Depends(require_role("ADMIN"))):
+    buffer = generate_teachers_template_excel()
+    return Response(
+        content=buffer.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="plantilla_docentes.xlsx"'},
+    )
+
+
+@router.post("/users/importar-docentes", name="admin.import_teachers_excel")
+async def import_teachers_excel(
+    request: Request,
+    excel_file: UploadFile = File(None),
+    current_user: User = Depends(require_role("ADMIN")),
+):
+    if not excel_file or excel_file.filename == "":
+        flash(request, "Selecciona un archivo Excel (.xlsx).", "warning")
+        return redirect_to("/admin/users")
+
+    if not excel_file.filename.lower().endswith(".xlsx"):
+        flash(request, "Solo se aceptan archivos .xlsx (Excel 2007+).", "danger")
+        return redirect_to("/admin/users")
+
+    try:
+        total = 0
+        chunks: list[bytes] = []
+        while True:
+            chunk = await excel_file.read(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _TEACHERS_EXCEL_MAX_BYTES:
+                flash(request, "El archivo supera el tamaño máximo permitido (5 MB).", "danger")
+                return redirect_to("/admin/users")
+            chunks.append(chunk)
+        content = b"".join(chunks)
+        if len(content) < 4 or content[:2] != b"PK":
+            flash(request, "El archivo no parece un Excel .xlsx válido.", "danger")
+            return redirect_to("/admin/users")
+        result = import_teachers_from_excel(io.BytesIO(content))
+    except ValueError as e:
+        flash(request, str(e), "danger")
+        return redirect_to("/admin/users")
+    except Exception as exc:
+        log_unexpected_exc(exc, "admin.import_teachers_excel")
+        flash(request, GENERIC_FLASH_MESSAGE, "danger")
+        return redirect_to("/admin/users")
+
+    return render(request, "admin/teachers_import_result.html", result=result)
+
+
 # ── CURSOS ────────────────────────────────────────────────────────────────────
 
 @router.get("/courses", name="admin.courses")
@@ -214,6 +274,35 @@ async def toggle_eda_lock(eda_id: int, request: Request, current_user: User = De
     estado = "bloqueada" if eda.locked else "desbloqueada"
     flash(request, f"{eda.nombre} ({eda.term.nombre}) {estado}.", "success")
     return redirect_to(f"/admin/terms?anio={eda.term.anio}")
+
+
+# ── Firmas en boletas (coordinadores / tutores) ───────────────────────────────
+
+@router.get("/boleta-firmas", name="admin.boleta_firmas")
+async def boleta_firmas_page(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    m = get_staff_map()
+    return render(
+        request,
+        "admin/boleta_firmas.html",
+        staff=m,
+        grados_inicial=GRADOS_INICIAL,
+        grados_primaria=GRADOS_PRIMARIA,
+        grados_secundaria=GRADOS_SECUNDARIA,
+    )
+
+
+@router.post("/boleta-firmas", name="admin.boleta_firmas_post")
+async def boleta_firmas_save(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    form = await request.form()
+    try:
+        data = {k: (form.get(k) or "").strip() for k in all_boleta_staff_keys()}
+        upsert_staff_map(data)
+        flash(request, "Datos de firmas de boletas guardados.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        log_unexpected_exc(exc, "admin.boleta_firmas_post")
+        flash(request, GENERIC_FLASH_MESSAGE, "danger")
+    return redirect_to("/admin/boleta-firmas")
 
 
 @router.post("/terms/seed", name="admin.seed_terms")

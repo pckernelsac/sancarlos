@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<title>Boleta — {{ student.full_name }}</title>
+<title>Boleta Secundaria — {{ student.full_name }}</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -151,8 +151,9 @@ body {
   </tr>
 </table>
 
-<!-- TÍTULO INFORME -->
-<div class="info-title">INFORME ACADÉMICO: {{ student.grado }}° DE PRIMARIA</div>
+<!-- TÍTULO INFORME (alineado al PDF secundaria) -->
+{% set grado_sec_map = {'1':'PRIMERO','2':'SEGUNDO','3':'TERCERO','4':'CUARTO','5':'QUINTO'} %}
+<div class="info-title">INFORME ACADÉMICO {{ grado_sec_map.get(student.grado|string, student.grado) }} DE SECUNDARIA</div>
 
 <!-- DATOS DEL ALUMNO -->
 <table class="info-table" cellpadding="0" cellspacing="0">
@@ -413,7 +414,7 @@ body {
   <tr>
     <td>
       <div class="sig-name">{{ (firma_boleta.coordinador if firma_boleta else '') or '____________________________' }}</div>
-      <div class="sig-role">{{ firma_coord_label|default('COORDINADORA') }}</div>
+      <div class="sig-role">{{ firma_coord_label|default('COORDINADOR(A)') }}</div>
     </td>
     <td>
       <div class="sig-name">{{ firma_boleta.director if firma_boleta else 'Lic. Glicerio Palacios Contreras' }}</div>
