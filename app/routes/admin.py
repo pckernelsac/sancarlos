@@ -20,7 +20,7 @@ from app.services.feature_flags import (
     is_eda_matrix_enabled_for_docentes,
     set_eda_matrix_enabled_for_docentes,
 )
-from app.models.student import GRADOS, NIVELES, GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
+from app.models.student import Student, GRADOS, NIVELES, GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
 from app import render, flash, redirect_to
 import datetime
 
@@ -349,3 +349,47 @@ async def seed_terms(request: Request, current_user: User = Depends(require_role
     db.session.commit()
     flash(request, f"{created_terms} bimestre(s) creados con sus EDAs para {anio}.", "success")
     return redirect_to(f"/admin/terms?anio={anio}")
+
+
+# ── ELIMINACIÓN MASIVA DE ESTUDIANTES ────────────────────────────────────────
+
+@router.get("/students/bulk-delete", name="admin.bulk_delete_students")
+async def bulk_delete_students_page(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    counts = dict(
+        db.session.query(Student.nivel, db.func.count(Student.id))
+        .group_by(Student.nivel).all()
+    )
+    return render(request, "admin/bulk_delete_students.html",
+                  niveles=NIVELES, counts=counts)
+
+
+@router.post("/students/bulk-delete", name="admin.bulk_delete_students_post")
+async def bulk_delete_students_submit(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    form = await request.form()
+
+    # Validar CSRF
+    nivel = (form.get("nivel") or "").strip().upper()
+    confirmacion = (form.get("confirmacion") or "").strip()
+
+    if nivel not in NIVELES:
+        flash(request, "Selecciona un nivel válido.", "danger")
+        return redirect_to("/admin/students/bulk-delete")
+
+    expected = f"ELIMINAR {nivel}"
+    if confirmacion != expected:
+        flash(request, f"Escribe exactamente «{expected}» para confirmar.", "danger")
+        return redirect_to("/admin/students/bulk-delete")
+
+    try:
+        students = Student.query.filter_by(nivel=nivel).all()
+        count = len(students)
+        for s in students:
+            db.session.delete(s)
+        db.session.commit()
+        flash(request, f"{count} estudiantes de {nivel} eliminados correctamente.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        log_unexpected_exc(exc, "admin.bulk_delete_students_post")
+        flash(request, GENERIC_FLASH_MESSAGE, "danger")
+
+    return redirect_to("/admin/students/bulk-delete")

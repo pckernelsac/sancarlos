@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, Response
 from app.auth.dependencies import require_login, require_role
 from app.services.student_service import get_all_students, create_student, update_student, delete_student, generate_student_code
 from app.services.excel_service import import_students_from_excel, generate_template_excel
-from app.models.student import Student, GRADOS, SECCIONES, ESTADOS, NIVELES
+from app.models.student import Student, GRADOS, SECCIONES, ESTADOS, NIVELES, GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
 from app.models.user import User, RoleEnum
 from app.models.academic import Course
 from app.security.permissions import can_edit_student
@@ -51,6 +51,10 @@ async def list_students(request: Request, current_user: User = Depends(require_l
     grado = request.query_params.get("grado", "")
     seccion = request.query_params.get("seccion", "")
     estado = request.query_params.get("estado", "ACTIVO")
+    try:
+        page = max(1, int(request.query_params.get("page", "1")))
+    except (ValueError, TypeError):
+        page = 1
 
     if current_user.role == RoleEnum.DOCENTE:
         doc_niveles, doc_grados = _docente_scope(current_user)
@@ -67,27 +71,44 @@ async def list_students(request: Request, current_user: User = Depends(require_l
         else:
             filter_grado = grado or None
 
-        students = get_all_students(
+        result = get_all_students(
             nivel=filter_nivel, grado=filter_grado,
             seccion=seccion or None, estado=estado or None,
             allowed_niveles=doc_niveles if not filter_nivel else None,
             allowed_grados=doc_grados if not filter_grado else None,
+            page=page,
         )
         filtros_niveles = doc_niveles
-        filtros_grados = doc_grados
     else:
-        students = get_all_students(
+        result = get_all_students(
             nivel=nivel or None, grado=grado or None,
             seccion=seccion or None, estado=estado or None,
+            page=page,
         )
         filtros_niveles = NIVELES
-        filtros_grados = GRADOS
+
+    grados_por_nivel = {
+        "INICIAL": GRADOS_INICIAL,
+        "PRIMARIA": GRADOS_PRIMARIA,
+        "SECUNDARIA": GRADOS_SECUNDARIA,
+    }
+
+    filtros = {"nivel": nivel, "grado": grado, "seccion": seccion, "estado": estado}
+
+    def _pagination_qs(pg):
+        from urllib.parse import urlencode
+        params = {k: v for k, v in filtros.items() if v}
+        params["page"] = pg
+        return urlencode(params)
 
     return render(
         request, "students/list.html",
-        students=students, niveles=filtros_niveles, grados=filtros_grados,
+        students=result["items"], niveles=filtros_niveles,
+        grados_por_nivel=grados_por_nivel,
         secciones=SECCIONES, estados=ESTADOS,
-        filtros={"nivel": nivel, "grado": grado, "seccion": seccion, "estado": estado},
+        filtros=filtros,
+        pagination={"page": result["page"], "total_pages": result["total_pages"], "total": result["total"]},
+        _pagination_qs=_pagination_qs,
     )
 
 

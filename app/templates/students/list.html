@@ -37,9 +37,9 @@
   {% endif %}
 </div>
 
-<!-- Filtros + búsqueda en tiempo real -->
+<!-- Filtros -->
 <div class="bg-white rounded-xl shadow p-4 mb-5">
-  <form method="GET" class="flex flex-wrap gap-3 items-end">
+  <form method="GET" id="filter-form" class="flex flex-wrap gap-3 items-end">
     <!-- Búsqueda live -->
     <div class="flex-1 min-w-[200px]">
       <label class="block text-xs font-semibold text-gray-600 mb-1">Buscar</label>
@@ -48,13 +48,13 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
-        <input type="text" id="search-input" placeholder="Nombre, apellido o c&oacute;digo..."
+        <input type="text" id="search-input" placeholder="Filtrar en esta p&aacute;gina..."
                class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"/>
       </div>
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-600 mb-1">Nivel</label>
-      <select name="nivel" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <select name="nivel" id="nivel-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
         <option value="">Todos</option>
         {% for n in niveles %}
         <option value="{{ n }}" {% if filtros.nivel == n %}selected{% endif %}>{{ n }}</option>
@@ -63,10 +63,16 @@
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-600 mb-1">Grado</label>
-      <select name="grado" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <select name="grado" id="grado-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
         <option value="">Todos</option>
-        {% for g in grados %}
-        <option value="{{ g }}" {% if filtros.grado == g %}selected{% endif %}>{{ g }}</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Secci&oacute;n</label>
+      <select name="seccion" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+        <option value="">Todas</option>
+        {% for sc in secciones %}
+        <option value="{{ sc }}" {% if filtros.seccion == sc %}selected{% endif %}>{{ sc }}</option>
         {% endfor %}
       </select>
     </div>
@@ -90,16 +96,41 @@
   </form>
 </div>
 
+<!-- Info de resultados -->
+<div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+  <div class="flex items-center gap-1.5">
+    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+    </svg>
+    <p class="text-xs text-gray-500">
+      <span class="font-semibold text-gray-700">{{ pagination.total }}</span> estudiantes encontrados
+      {% if filtros.nivel or filtros.grado or filtros.seccion %}
+      <span class="text-gray-400">&mdash;
+        {% if filtros.nivel %}{{ filtros.nivel }}{% endif %}
+        {% if filtros.grado %}
+          {% if filtros.nivel == 'INICIAL' %}{{ filtros.grado }} a&ntilde;os{% else %}{{ filtros.grado }}&deg; grado{% endif %}
+        {% endif %}
+        {% if filtros.seccion %} secci&oacute;n {{ filtros.seccion }}{% endif %}
+      </span>
+      {% endif %}
+    </p>
+  </div>
+  {% if pagination.total_pages > 1 %}
+  <p class="text-xs text-gray-400">P&aacute;gina {{ pagination.page }} de {{ pagination.total_pages }}</p>
+  {% endif %}
+</div>
+
 <!-- Tabla -->
 <div class="bg-white rounded-xl shadow table-wrap">
   <table class="w-full text-sm" id="students-table">
     <thead class="bg-brand text-white text-xs uppercase tracking-wide">
       <tr>
-        <th class="px-4 py-3 text-left">Código</th>
+        <th class="px-4 py-3 text-left">C&oacute;digo</th>
         <th class="px-4 py-3 text-left">Apellidos y Nombres</th>
         <th class="px-4 py-3 text-center">Nivel</th>
         <th class="px-4 py-3 text-center">Grado</th>
-        <th class="px-4 py-3 text-center">Sección</th>
+        <th class="px-4 py-3 text-center">Secci&oacute;n</th>
         <th class="px-4 py-3 text-center">Estado</th>
         <th class="px-4 py-3 text-center">Acciones</th>
       </tr>
@@ -125,7 +156,9 @@
             {{ s.nivel }}
           </span>
         </td>
-        <td class="px-4 py-3 text-center">{{ s.grado }}</td>
+        <td class="px-4 py-3 text-center">
+          {% if s.nivel == 'INICIAL' %}{{ s.grado }} a&ntilde;os{% else %}{{ s.grado }}&deg;{% endif %}
+        </td>
         <td class="px-4 py-3 text-center">{{ s.seccion }}</td>
         <td class="px-4 py-3 text-center">
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
@@ -212,7 +245,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                 d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
-            <p class="text-sm text-gray-400">No se encontraron estudiantes.</p>
+            <p class="text-sm text-gray-400">No se encontraron estudiantes con los filtros seleccionados.</p>
           </div>
         </td>
       </tr>
@@ -220,37 +253,119 @@
     </tbody>
   </table>
 </div>
-<div class="flex items-center gap-1.5 mt-2">
-  <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-  </svg>
-  <p class="text-xs text-gray-400">Total: {{ students | length }} estudiantes</p>
-</div>
 
-<!-- Toasts: boleta PDF y otros avisos sin alert() -->
+<!-- Paginación -->
+{% if pagination.total_pages > 1 %}
+<nav class="flex items-center justify-between mt-4 flex-wrap gap-3" aria-label="Paginaci&oacute;n">
+  <p class="text-xs text-gray-500">
+    Mostrando {{ ((pagination.page - 1) * 20) + 1 }}&ndash;{{ [pagination.page * 20, pagination.total] | min }} de {{ pagination.total }}
+  </p>
+  <div class="flex items-center gap-1">
+    {# Anterior #}
+    {% if pagination.page > 1 %}
+    <a href="?{{ _pagination_qs(pagination.page - 1) }}"
+       class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-brand hover:text-white hover:border-brand transition text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    {% else %}
+    <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </span>
+    {% endif %}
+
+    {# Páginas #}
+    {% set ns = namespace(last_shown=0) %}
+    {% for p in range(1, pagination.total_pages + 1) %}
+      {% if p == 1 or p == pagination.total_pages or (p >= pagination.page - 2 and p <= pagination.page + 2) %}
+        {% if ns.last_shown and p > ns.last_shown + 1 %}
+        <span class="inline-flex items-center justify-center w-9 h-9 text-gray-400 text-sm">&hellip;</span>
+        {% endif %}
+        {% if p == pagination.page %}
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-brand text-white font-semibold text-sm">{{ p }}</span>
+        {% else %}
+        <a href="?{{ _pagination_qs(p) }}"
+           class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-brand hover:text-white hover:border-brand transition text-sm">{{ p }}</a>
+        {% endif %}
+        {% set ns.last_shown = p %}
+      {% endif %}
+    {% endfor %}
+
+    {# Siguiente #}
+    {% if pagination.page < pagination.total_pages %}
+    <a href="?{{ _pagination_qs(pagination.page + 1) }}"
+       class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-brand hover:text-white hover:border-brand transition text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
+    {% else %}
+    <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </span>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}
+
+<!-- Toasts -->
 <div id="student-toast-host" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-[calc(100%-2rem)] sm:w-auto pointer-events-none" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Búsqueda en tiempo real sin llamadas al servidor
+(function() {
+  // Grados dinámicos según nivel
+  var gradosPorNivel = {{ grados_por_nivel | tojson }};
+  var nivelSelect = document.getElementById('nivel-select');
+  var gradoSelect = document.getElementById('grado-select');
+  var currentGrado = {{ filtros.grado | tojson }};
+
+  function updateGrados() {
+    var nivel = nivelSelect.value;
+    var grados = nivel ? (gradosPorNivel[nivel] || []) : [];
+    // Si no hay nivel seleccionado, mostrar todos los grados únicos
+    if (!nivel) {
+      var all = [];
+      var seen = {};
+      Object.keys(gradosPorNivel).forEach(function(n) {
+        gradosPorNivel[n].forEach(function(g) {
+          if (!seen[g]) { seen[g] = true; all.push(g); }
+        });
+      });
+      grados = all.sort(function(a,b) { return parseInt(a) - parseInt(b); });
+    }
+    gradoSelect.innerHTML = '<option value="">Todos</option>';
+    var isInicial = nivel === 'INICIAL';
+    grados.forEach(function(g) {
+      var opt = document.createElement('option');
+      opt.value = g;
+      opt.textContent = isInicial ? (g + ' años') : (g + '°');
+      if (g === currentGrado) opt.selected = true;
+      gradoSelect.appendChild(opt);
+    });
+  }
+
+  nivelSelect.addEventListener('change', function() {
+    currentGrado = '';
+    updateGrados();
+  });
+  updateGrados();
+
+  // Búsqueda en tiempo real (filtra la página actual)
   document.getElementById('search-input').addEventListener('input', function () {
-    const q = this.value.toLowerCase().trim();
-    document.querySelectorAll('.student-row').forEach(row => {
+    var q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.student-row').forEach(function(row) {
       row.style.display = (q === '' || row.dataset.search.includes(q)) ? '' : 'none';
     });
   });
 
   function _filenameFromContentDisposition(cd) {
     if (!cd) return 'boleta.pdf';
-    const star = cd.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
+    var star = cd.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
     if (star) {
       try { return decodeURIComponent(star[1].replace(/"/g, '')); } catch (e) { /* ignore */ }
     }
-    const q = cd.match(/filename\s*=\s*"([^"]+)"/i);
+    var q = cd.match(/filename\s*=\s*"([^"]+)"/i);
     if (q) return q[1];
-    const u = cd.match(/filename\s*=\s*([^;\s]+)/i);
+    var u = cd.match(/filename\s*=\s*([^;\s]+)/i);
     if (u) return u[1].replace(/"/g, '');
     return 'boleta.pdf';
   }
@@ -275,30 +390,30 @@
     }, ms);
   }
 
-  // Boleta PDF: indicador de carga aquí; al terminar se descarga el archivo (sin pestaña nueva)
+  // Boleta PDF
   document.querySelectorAll('.boleta-pdf-btn').forEach(function (btn) {
     btn.addEventListener('click', async function () {
-      const url = this.dataset.boletaUrl;
+      var url = this.dataset.boletaUrl;
       if (!url || this.disabled) return;
-      const idle = this.querySelector('.boleta-pdf-idle');
-      const loading = this.querySelector('.boleta-pdf-loading');
+      var idle = this.querySelector('.boleta-pdf-idle');
+      var loading = this.querySelector('.boleta-pdf-loading');
       this.disabled = true;
       this.setAttribute('aria-busy', 'true');
       if (idle) idle.classList.add('hidden');
       if (loading) loading.classList.remove('hidden');
       try {
-        const res = await fetch(url, { credentials: 'same-origin' });
+        var res = await fetch(url, { credentials: 'same-origin' });
         if (!res.ok) {
           throw new Error(res.status === 403 ? 'Sin permiso para esta boleta.' : 'No se pudo generar el PDF (' + res.status + ').');
         }
-        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        var ct = (res.headers.get('content-type') || '').toLowerCase();
         if (!ct.includes('application/pdf')) {
           throw new Error('La respuesta no es un PDF. ¿Sesión expirada? Recargue la página e intente de nuevo.');
         }
-        const filename = _filenameFromContentDisposition(res.headers.get('Content-Disposition'));
-        const blob = await res.blob();
-        const objUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var filename = _filenameFromContentDisposition(res.headers.get('Content-Disposition'));
+        var blob = await res.blob();
+        var objUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = objUrl;
         a.download = filename;
         a.rel = 'noopener';
@@ -317,5 +432,6 @@
       }
     });
   });
+})();
 </script>
 {% endblock %}

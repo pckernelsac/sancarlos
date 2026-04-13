@@ -108,36 +108,50 @@ def import_students_from_excel(file_stream) -> dict:
             })
             continue
 
-        # Generar código único automáticamente
-        codigo = generate_student_code(ap_paterno, ap_materno)
         nombre_completo = f"{ap_paterno} {ap_materno}, {nombres}".strip()
 
-        # Verificar si ya existe un estudiante con mismo DNI para evitar duplicados
+        # Verificar duplicados: primero por DNI, luego por nombre+nivel+grado
+        existing = None
         if dni:
             existing = Student.query.filter_by(dni=dni).first()
-            if existing:
-                existing.apellido_paterno = ap_paterno
-                existing.apellido_materno = ap_materno
-                existing.nombres          = nombres
-                existing.nivel            = nivel
-                existing.grado            = grado
-                existing.seccion          = seccion
-                existing.estado           = estado
-                existing.fecha_nacimiento = fecha
-                result["actualizados"] += 1
-                result["detalle"].append({
-                    "fila": row_num,
-                    "codigo": existing.codigo,
-                    "nombre": nombre_completo,
-                    "accion": "ACTUALIZADO",
-                })
-                continue
+        if not existing:
+            existing = Student.query.filter_by(
+                apellido_paterno=ap_paterno,
+                apellido_materno=ap_materno,
+                nombres=nombres,
+                nivel=nivel,
+                grado=grado,
+            ).first()
+
+        if existing:
+            existing.apellido_paterno = ap_paterno
+            existing.apellido_materno = ap_materno
+            existing.nombres          = nombres
+            existing.nivel            = nivel
+            existing.grado            = grado
+            existing.seccion          = seccion
+            existing.estado           = estado
+            existing.fecha_nacimiento = fecha
+            if dni:
+                existing.dni = dni
+            result["actualizados"] += 1
+            result["detalle"].append({
+                "fila": row_num,
+                "codigo": existing.codigo,
+                "nombre": nombre_completo,
+                "accion": "ACTUALIZADO",
+            })
+            continue
+
+        # Generar código único automáticamente
+        codigo = generate_student_code(ap_paterno, ap_materno)
 
         db.session.add(Student(
             codigo=codigo, apellido_paterno=ap_paterno, apellido_materno=ap_materno,
             nombres=nombres, nivel=nivel, grado=grado, seccion=seccion, dni=dni,
             estado=estado, fecha_nacimiento=fecha,
         ))
+        db.session.flush()
         result["insertados"] += 1
 
         result["detalle"].append({

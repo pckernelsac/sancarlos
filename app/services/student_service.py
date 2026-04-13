@@ -47,7 +47,8 @@ def generate_student_code(apellido_paterno: str, apellido_materno: str = "") -> 
 
 
 def get_all_students(nivel=None, grado=None, seccion=None, estado="ACTIVO",
-                     allowed_niveles=None, allowed_grados=None):
+                     allowed_niveles=None, allowed_grados=None,
+                     page=1, per_page=20):
     q = Student.query
     if estado:
         q = q.filter_by(estado=estado)
@@ -61,7 +62,18 @@ def get_all_students(nivel=None, grado=None, seccion=None, estado="ACTIVO",
         q = q.filter(Student.grado.in_(allowed_grados))
     if seccion:
         q = q.filter_by(seccion=seccion)
-    return q.order_by(Student.apellido_paterno, Student.apellido_materno, Student.nombres).all()
+    q = q.order_by(Student.nivel, Student.grado, Student.seccion,
+                   Student.apellido_paterno, Student.apellido_materno, Student.nombres)
+    total = q.count()
+    students = q.offset((page - 1) * per_page).limit(per_page).all()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return {
+        "items": students,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }
 
 
 def create_student(data: dict) -> Student:
@@ -108,16 +120,30 @@ def get_dashboard_stats(nivel=None, grado=None) -> dict:
     if grado:
         q = q.filter_by(grado=grado)
     total = q.count()
-    by_grado = (
-        db.session.query(Student.grado, db.func.count(Student.id))
+    by_nivel_grado = (
+        db.session.query(Student.nivel, Student.grado, db.func.count(Student.id))
         .filter_by(estado="ACTIVO")
     )
     if nivel:
-        by_grado = by_grado.filter_by(nivel=nivel)
+        by_nivel_grado = by_nivel_grado.filter_by(nivel=nivel)
     if grado:
-        by_grado = by_grado.filter_by(grado=grado)
-    by_grado = by_grado.group_by(Student.grado).all()
+        by_nivel_grado = by_nivel_grado.filter_by(grado=grado)
+    by_nivel_grado = by_nivel_grado.group_by(Student.nivel, Student.grado).all()
+
+    NIVEL_ORDER = {"INICIAL": 0, "PRIMARIA": 1, "SECUNDARIA": 2}
+    sorted_rows = sorted(by_nivel_grado, key=lambda r: (NIVEL_ORDER.get(r[0], 9), int(r[1])))
+
+    por_grado = {}
+    for niv, gr, count in sorted_rows:
+        if niv == "INICIAL":
+            label = f"{gr} años de Inicial"
+        elif niv == "PRIMARIA":
+            label = f"{gr}° de Primaria"
+        else:
+            label = f"{gr}° de Secundaria"
+        por_grado[label] = count
+
     return {
         "total_activos": total,
-        "por_grado": {g: c for g, c in by_grado},
+        "por_grado": por_grado,
     }
