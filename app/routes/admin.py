@@ -393,3 +393,38 @@ async def bulk_delete_students_submit(request: Request, current_user: User = Dep
         flash(request, GENERIC_FLASH_MESSAGE, "danger")
 
     return redirect_to("/admin/students/bulk-delete")
+
+
+# ── REGENERAR CÓDIGOS DE ESTUDIANTES ─────────────────────────────────────────
+
+@router.get("/students/regenerate-codes", name="admin.regenerate_codes")
+async def regenerate_codes_page(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    counts = dict(
+        db.session.query(Student.nivel, db.func.count(Student.id))
+        .group_by(Student.nivel).all()
+    )
+    total = sum(counts.values())
+    return render(request, "admin/regenerate_codes.html",
+                  niveles=NIVELES, counts=counts, total=total)
+
+
+@router.post("/students/regenerate-codes", name="admin.regenerate_codes_post")
+async def regenerate_codes_submit(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    from app.services.student_service import regenerate_codes
+    form = await request.form()
+    nivel = (form.get("nivel") or "").strip().upper()
+
+    if nivel and nivel not in NIVELES:
+        flash(request, "Nivel no válido.", "danger")
+        return redirect_to("/admin/students/regenerate-codes")
+
+    try:
+        count = regenerate_codes(nivel=nivel or None)
+        label = nivel if nivel else "todos los niveles"
+        flash(request, f"{count} códigos de {label} regenerados correctamente.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        log_unexpected_exc(exc, "admin.regenerate_codes_post")
+        flash(request, GENERIC_FLASH_MESSAGE, "danger")
+
+    return redirect_to("/admin/students/regenerate-codes")

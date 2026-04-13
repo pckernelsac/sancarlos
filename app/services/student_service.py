@@ -113,6 +113,30 @@ def delete_student(student_id: int):
     db.session.commit()
 
 
+def regenerate_codes(nivel=None):
+    """Regenera códigos de todos los estudiantes (o de un nivel).
+    Retorna la cantidad de códigos regenerados."""
+    q = Student.query.order_by(Student.apellido_paterno, Student.apellido_materno, Student.nombres)
+    if nivel:
+        q = q.filter_by(nivel=nivel)
+    students = q.all()
+    if not students:
+        return 0
+
+    # Paso 1: asignar códigos temporales para evitar conflictos UNIQUE
+    for i, s in enumerate(students):
+        s.codigo = f"_REGEN_{i}"
+    db.session.flush()
+
+    # Paso 2: generar códigos definitivos en orden
+    for s in students:
+        s.codigo = generate_student_code(s.apellido_paterno, s.apellido_materno)
+        db.session.flush()
+
+    db.session.commit()
+    return len(students)
+
+
 def get_dashboard_stats(nivel=None, grado=None) -> dict:
     q = Student.query.filter_by(estado="ACTIVO")
     if nivel:

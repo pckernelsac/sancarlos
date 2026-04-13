@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Regenerar Códigos de Estudiantes{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <div class="bg-amber-100 rounded-xl p-2.5">
+    <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800">Regenerar C&oacute;digos</h1>
+    <p class="text-sm text-gray-500">Genera nuevos c&oacute;digos correlativos para los estudiantes</p>
+  </div>
+</div>
+
+<!-- Resumen por nivel -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+  {% set nivel_colors = {'INICIAL': 'green', 'PRIMARIA': 'blue', 'SECUNDARIA': 'purple'} %}
+  {% set nivel_icons = {
+    'INICIAL': 'M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    'PRIMARIA': 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+    'SECUNDARIA': 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
+  } %}
+  {% for n in niveles %}
+  {% set color = nivel_colors.get(n, 'gray') %}
+  {% set count = counts.get(n, 0) %}
+  <div class="bg-white rounded-xl shadow p-5 border-l-4 border-{{ color }}-400 flex items-center gap-4">
+    <div class="bg-{{ color }}-50 rounded-lg p-2.5 shrink-0">
+      <svg class="w-6 h-6 text-{{ color }}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ nivel_icons.get(n, '') }}"/>
+      </svg>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide">{{ n }}</p>
+      <p class="text-3xl font-bold text-{{ color }}-600">{{ count }}</p>
+      <p class="text-xs text-gray-400">estudiantes</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Formulario -->
+<div class="bg-white rounded-xl shadow p-6 max-w-lg">
+  <div class="flex items-center gap-2 mb-4">
+    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <h2 class="text-lg font-semibold text-gray-700">Regenerar c&oacute;digos</h2>
+  </div>
+
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5 text-sm text-amber-800">
+    <p class="font-semibold mb-1">Los c&oacute;digos anteriores ser&aacute;n reemplazados.</p>
+    <p>Se asignar&aacute;n nuevos c&oacute;digos correlativos (ej: GL20260001, GL20260002...) basados en las iniciales de los apellidos. Las notas, asistencia y dem&aacute;s datos no se ven afectados.</p>
+  </div>
+
+  <form method="POST" id="regen-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-5">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Nivel</label>
+      <select name="nivel" id="nivel-select"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <option value="">Todos los niveles ({{ total }} estudiantes)</option>
+        {% for n in niveles %}
+        <option value="{{ n }}">{{ n }} ({{ counts.get(n, 0) }} estudiantes)</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" id="regen-btn"
+            class="w-full inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-amber-600 transition text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      Regenerar C&oacute;digos
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  document.getElementById('regen-form').addEventListener('submit', function(e) {
+    var select = document.getElementById('nivel-select');
+    var label = select.value ? select.value : 'TODOS LOS NIVELES';
+    if (!confirm('¿Regenerar los códigos de ' + label + '?\n\nLos códigos anteriores serán reemplazados.')) {
+      e.preventDefault();
+    }
+  });
+})();
+</script>
+{% endblock %}
