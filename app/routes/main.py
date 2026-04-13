@@ -18,7 +18,12 @@ router = APIRouter(tags=["main"])
 
 def _dash_scope(current_user):
     if current_user.role == RoleEnum.DOCENTE:
-        return current_user.nivel, current_user.grado
+        from app.utils.scope import _docente_scope_from_courses
+        niveles, grados = _docente_scope_from_courses(current_user)
+        # Si tiene un solo nivel, filtrar por él; si varios, mostrar todos
+        nivel = list(niveles)[0] if len(niveles) == 1 else None
+        grado = list(grados)[0] if len(grados) == 1 else None
+        return nivel, grado
     return None, None
 
 

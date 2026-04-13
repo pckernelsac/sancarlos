@@ -66,6 +66,9 @@
               <option value="{{ n }}" {{ 'selected' if user and user.nivel == n }}>{{ n }}</option>
               {% endfor %}
             </select>
+            <p id="nivel-hint-docente" class="text-[10px] text-gray-400 mt-1" style="display:none;">
+              Opcional para docentes. Los niveles se derivan de los cursos asignados.
+            </p>
           </div>
 
           <div id="grado-section" style="display:none;">
@@ -236,10 +239,13 @@
 
   function togglePanel() {
     const isDocente = roleSelect.value === 'DOCENTE';
-    const isDocenteOrAux = roleSelect.value === 'DOCENTE' || roleSelect.value === 'AUXILIAR';
+    const isAuxiliar = roleSelect.value === 'AUXILIAR';
+    const isDocenteOrAux = isDocente || isAuxiliar;
     panel.style.display = isDocente ? '' : 'none';
     nivelGradoSection.style.display = isDocenteOrAux ? '' : 'none';
     gradoSection.style.display = isDocenteOrAux ? '' : 'none';
+    const hint = document.getElementById('nivel-hint-docente');
+    if (hint) hint.style.display = isDocente ? '' : 'none';
   }
   roleSelect.addEventListener('change', togglePanel);
   togglePanel();
