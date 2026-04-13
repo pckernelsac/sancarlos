@@ -113,6 +113,59 @@ def delete_student(student_id: int):
     db.session.commit()
 
 
+def find_duplicates():
+    """Encuentra estudiantes duplicados (mismo nombre + nivel + grado).
+    Retorna lista de grupos: [{"key": str, "keep": Student, "duplicates": [Student...]}]
+    """
+    from sqlalchemy import func
+    # Buscar combinaciones con más de un registro
+    dupes = (
+        db.session.query(
+            Student.apellido_paterno, Student.apellido_materno,
+            Student.nombres, Student.nivel, Student.grado,
+            func.count(Student.id).label("cnt"),
+        )
+        .group_by(
+            Student.apellido_paterno, Student.apellido_materno,
+            Student.nombres, Student.nivel, Student.grado,
+        )
+        .having(func.count(Student.id) > 1)
+        .all()
+    )
+    groups = []
+    for ap, am, nom, niv, gr, cnt in dupes:
+        students = (
+            Student.query
+            .filter_by(
+                apellido_paterno=ap, apellido_materno=am,
+                nombres=nom, nivel=niv, grado=gr,
+            )
+            .order_by(Student.id)
+            .all()
+        )
+        keep = students[0]
+        groups.append({
+            "key": f"{ap} {am}, {nom} — {niv} {gr}°",
+            "keep": keep,
+            "duplicates": students[1:],
+            "total": len(students),
+        })
+    return groups
+
+
+def remove_duplicates():
+    """Elimina estudiantes duplicados, conservando el registro más antiguo (menor ID).
+    Retorna cantidad de registros eliminados."""
+    groups = find_duplicates()
+    removed = 0
+    for g in groups:
+        for dup in g["duplicates"]:
+            db.session.delete(dup)
+            removed += 1
+    db.session.commit()
+    return removed
+
+
 def regenerate_codes(nivel=None):
     """Regenera códigos de todos los estudiantes (o de un nivel).
     Retorna la cantidad de códigos regenerados."""

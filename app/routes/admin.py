@@ -428,3 +428,30 @@ async def regenerate_codes_submit(request: Request, current_user: User = Depends
         flash(request, GENERIC_FLASH_MESSAGE, "danger")
 
     return redirect_to("/admin/students/regenerate-codes")
+
+
+# ── LIMPIAR DUPLICADOS ───────────────────────────────────────────────────────
+
+@router.get("/students/duplicates", name="admin.student_duplicates")
+async def student_duplicates_page(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    from app.services.student_service import find_duplicates
+    groups = find_duplicates()
+    total_dupes = sum(len(g["duplicates"]) for g in groups)
+    return render(request, "admin/student_duplicates.html",
+                  groups=groups, total_dupes=total_dupes)
+
+
+@router.post("/students/duplicates/clean", name="admin.clean_duplicates_post")
+async def clean_duplicates_submit(request: Request, current_user: User = Depends(require_role("ADMIN"))):
+    from app.services.student_service import remove_duplicates
+    try:
+        removed = remove_duplicates()
+        if removed:
+            flash(request, f"{removed} registro(s) duplicados eliminados.", "success")
+        else:
+            flash(request, "No se encontraron duplicados.", "info")
+    except Exception as exc:
+        db.session.rollback()
+        log_unexpected_exc(exc, "admin.clean_duplicates_post")
+        flash(request, GENERIC_FLASH_MESSAGE, "danger")
+    return redirect_to("/admin/students/duplicates")
