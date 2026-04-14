@@ -14,7 +14,7 @@
   </div>
 </div>
 
-{% set readonly_eda = current_user.has_role('DOCENTE') %}
+{% set readonly_eda = current_user.has_role('DOCENTE') and not eda_matrix_docente_enabled %}
 {% set is_docente = current_user.has_role('DOCENTE') %}
 {% set term_locked = term is defined and term and term.locked %}
 

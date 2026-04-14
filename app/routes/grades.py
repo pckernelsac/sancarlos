@@ -215,8 +215,8 @@ async def save_eda_grade(request: Request, current_user: User = Depends(require_
     except ValidationError:
         return JSONResponse({"ok": False, "error": "Datos inválidos."}, status_code=400)
 
-    if current_user.has_role("DOCENTE"):
-        return JSONResponse({"ok": False, "error": "Los docentes deben ingresar notas desde el Registro Auxiliar."}, status_code=403)
+    if current_user.has_role("DOCENTE") and not is_eda_matrix_enabled_for_docentes():
+        return JSONResponse({"ok": False, "error": "La matriz de EDAs no está habilitada para docentes."}, status_code=403)
 
     student = db.session.get(Student, p.student_id)
     if not student:
@@ -229,6 +229,14 @@ async def save_eda_grade(request: Request, current_user: User = Depends(require_
         numeric_value = int(raw) if str(raw).strip() != "" else None
     except (ValueError, TypeError):
         return JSONResponse({"ok": False, "error": "Nota no válida."}, status_code=400)
+
+    if current_user.has_role("DOCENTE"):
+        eda_check = db.session.get(EDA, p.eda_id)
+        if eda_check and eda_check.locked:
+            return JSONResponse({"ok": False, "error": "La EDA está bloqueada. Contacta al administrador."}, status_code=423)
+        term_check = db.session.get(Term, eda_check.term_id) if eda_check else None
+        if term_check and term_check.locked:
+            return JSONResponse({"ok": False, "error": "El bimestre está bloqueado. Contacta al administrador."}, status_code=423)
 
     try:
         eg = upsert_eda_grade(p.student_id, p.course_id, p.eda_id, numeric_value)
