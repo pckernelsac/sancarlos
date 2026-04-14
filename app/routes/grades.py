@@ -157,7 +157,10 @@ async def save_grade(request: Request, current_user: User = Depends(require_role
 
     try:
         raw = p.numeric_value
-        numeric_value = int(raw) if str(raw).strip() != "" else None
+        if raw is None or str(raw).strip() == "":
+            numeric_value = None
+        else:
+            numeric_value = int(raw)
     except (ValueError, TypeError):
         return JSONResponse({"ok": False, "error": "Nota no válida."}, status_code=400)
 
@@ -240,7 +243,10 @@ async def save_eda_grade(request: Request, current_user: User = Depends(require_
 
     try:
         raw = p.numeric_value
-        numeric_value = int(raw) if str(raw).strip() != "" else None
+        if raw is None or str(raw).strip() == "":
+            numeric_value = None
+        else:
+            numeric_value = int(raw)
     except (ValueError, TypeError):
         return JSONResponse({"ok": False, "error": "Nota no válida."}, status_code=400)
 
