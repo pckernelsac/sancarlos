@@ -84,10 +84,10 @@ class _Database:
 
     def ensure_schema(self) -> None:
         """
-        Crea tablas faltantes y comprueba que el esquema mínimo exista.
+        Crea tablas faltantes, agrega columnas nuevas y comprueba que el esquema mínimo exista.
         Falla al arrancar si la BD está vacía o sin permisos CREATE (mejor que un 500 en login).
         """
-        from sqlalchemy import inspect
+        from sqlalchemy import inspect, text
 
         self.create_all()
         insp = inspect(self.engine)
@@ -100,6 +100,25 @@ class _Database:
                 "Tras create_all() no existe la tabla 'users'. Revise DATABASE_URL, que apunte "
                 "a la base correcta y que el usuario tenga permiso CREATE en el esquema public."
             )
+
+        # --- Migraciones ligeras: columnas nuevas en tablas existentes ---
+        self._ensure_columns(insp)
+
+    def _ensure_columns(self, insp) -> None:
+        """Agrega columnas faltantes a tablas existentes (create_all no lo hace)."""
+        from sqlalchemy import text
+        _migrations = [
+            # (tabla, columna, DDL postgres, DDL sqlite)
+            ("teacher_courses", "grados",
+             "ALTER TABLE teacher_courses ADD COLUMN grados VARCHAR(40)",
+             "ALTER TABLE teacher_courses ADD COLUMN grados VARCHAR(40)"),
+        ]
+        for table, col, pg_ddl, lite_ddl in _migrations:
+            cols = {c["name"] for c in insp.get_columns(table)}
+            if col not in cols:
+                ddl = pg_ddl if self.engine.dialect.name == "postgresql" else lite_ddl
+                with self.engine.begin() as conn:
+                    conn.execute(text(ddl))
 
     def drop_all(self):
         Base.metadata.drop_all(self.engine)
