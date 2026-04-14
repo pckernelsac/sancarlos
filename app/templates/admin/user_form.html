@@ -186,20 +186,45 @@
                   <div class="area-grid p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {% endif %}
 
-                    <label class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border cursor-pointer
-                                  hover:border-brand hover:bg-blue-50/50 transition text-sm
+                    <div class="course-item rounded-lg border transition text-sm
                                   {{ 'border-brand bg-blue-50' if course.id in assigned_ids else 'border-gray-100 bg-white' }}">
-                      <input type="checkbox" name="course_ids" value="{{ course.id }}"
-                             {{ 'checked' if course.id in assigned_ids }}
-                             onchange="updateCourseCounter()"
-                             class="course-cb w-4 h-4 accent-brand shrink-0">
-                      <div class="min-w-0">
-                        <div class="font-semibold text-gray-800 text-xs truncate">{{ course.nombre }}</div>
-                        {% if course.grado %}
-                        <div class="text-[10px] text-gray-400">Solo {{ course.grado }}&deg;</div>
-                        {% endif %}
+                      <label class="flex items-center gap-2.5 px-2.5 py-2 cursor-pointer
+                                    hover:border-brand hover:bg-blue-50/50">
+                        <input type="checkbox" name="course_ids" value="{{ course.id }}"
+                               {{ 'checked' if course.id in assigned_ids }}
+                               onchange="toggleGradoSelector(this); updateCourseCounter()"
+                               class="course-cb w-4 h-4 accent-brand shrink-0"
+                               data-course-id="{{ course.id }}"
+                               data-has-grado="{{ 'yes' if course.grado else 'no' }}">
+                        <div class="min-w-0">
+                          <div class="font-semibold text-gray-800 text-xs truncate">{{ course.nombre }}</div>
+                          {% if course.grado %}
+                          <div class="text-[10px] text-gray-400">Solo {{ course.grado }}&deg;</div>
+                          {% endif %}
+                        </div>
+                      </label>
+                      {% if not course.grado %}
+                      {# Curso multi-grado: mostrar selector de grados #}
+                      {% set tc_grados = assigned_grados_map.get(course.id) %}
+                      <div class="grado-selector px-2.5 pb-2 flex flex-wrap gap-1"
+                           id="grados-{{ course.id }}"
+                           style="{{ '' if course.id in assigned_ids else 'display:none' }}">
+                        <span class="text-[10px] text-gray-400 w-full">Grados:</span>
+                        {% for g in grados_map.get(course.nivel, []) %}
+                        <label class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] cursor-pointer
+                                      {{ 'border-brand bg-brand/10 text-brand font-bold' if tc_grados is not none and g in tc_grados else 'border-gray-200 text-gray-500' }}
+                                      hover:border-brand">
+                          <input type="checkbox" name="course_grados_{{ course.id }}" value="{{ g }}"
+                                 {{ 'checked' if tc_grados is not none and g in tc_grados }}
+                                 onchange="updateGradoPill(this)"
+                                 class="grado-cb hidden">
+                          {{ g }}&deg;
+                        </label>
+                        {% endfor %}
+                        <span class="text-[9px] text-gray-300 w-full mt-0.5">Sin marcar = todos los grados</span>
                       </div>
-                    </label>
+                      {% endif %}
+                    </div>
 
             {% endfor %}
             {% if all_courses %}
@@ -294,24 +319,47 @@
 function updateCourseCounter() {
   const n = document.querySelectorAll('.course-cb:checked').length;
   document.getElementById('course-counter').textContent = n + ' seleccionado' + (n !== 1 ? 's' : '');
-  // Update label styles
+  // Update card styles
   document.querySelectorAll('.course-cb').forEach(cb => {
-    const label = cb.closest('label');
+    const card = cb.closest('.course-item');
+    if (!card) return;
     if (cb.checked) {
-      label.classList.add('border-brand', 'bg-blue-50');
-      label.classList.remove('border-gray-100', 'bg-white');
+      card.classList.add('border-brand', 'bg-blue-50');
+      card.classList.remove('border-gray-100', 'bg-white');
     } else {
-      label.classList.remove('border-brand', 'bg-blue-50');
-      label.classList.add('border-gray-100', 'bg-white');
+      card.classList.remove('border-brand', 'bg-blue-50');
+      card.classList.add('border-gray-100', 'bg-white');
     }
   });
+}
+
+function toggleGradoSelector(cb) {
+  const courseId = cb.dataset.courseId;
+  const sel = document.getElementById('grados-' + courseId);
+  if (!sel) return;
+  sel.style.display = cb.checked ? '' : 'none';
+  if (!cb.checked) {
+    // Limpiar grados al desmarcar el curso
+    sel.querySelectorAll('.grado-cb').forEach(g => { g.checked = false; updateGradoPill(g); });
+  }
+}
+
+function updateGradoPill(cb) {
+  const label = cb.closest('label');
+  if (cb.checked) {
+    label.classList.add('border-brand', 'bg-brand/10', 'text-brand', 'font-bold');
+    label.classList.remove('border-gray-200', 'text-gray-500');
+  } else {
+    label.classList.remove('border-brand', 'bg-brand/10', 'text-brand', 'font-bold');
+    label.classList.add('border-gray-200', 'text-gray-500');
+  }
 }
 
 function toggleArea(btn) {
   const grid = btn.closest('.area-card').querySelector('.area-grid');
   const cbs = grid.querySelectorAll('.course-cb');
   const allChecked = Array.from(cbs).every(cb => cb.checked);
-  cbs.forEach(cb => { cb.checked = !allChecked; });
+  cbs.forEach(cb => { cb.checked = !allChecked; toggleGradoSelector(cb); });
   updateCourseCounter();
 }
 
@@ -319,21 +367,21 @@ function toggleNivel(btn, nivel) {
   const group = btn.closest('.nivel-group');
   const cbs = group.querySelectorAll('.course-cb');
   const allChecked = Array.from(cbs).every(cb => cb.checked);
-  cbs.forEach(cb => { cb.checked = !allChecked; });
+  cbs.forEach(cb => { cb.checked = !allChecked; toggleGradoSelector(cb); });
   updateCourseCounter();
 }
 
 function selectAllCourses() {
   document.querySelectorAll('.nivel-group').forEach(g => {
     if (g.style.display !== 'none') {
-      g.querySelectorAll('.course-cb').forEach(cb => { cb.checked = true; });
+      g.querySelectorAll('.course-cb').forEach(cb => { cb.checked = true; toggleGradoSelector(cb); });
     }
   });
   updateCourseCounter();
 }
 
 function deselectAllCourses() {
-  document.querySelectorAll('.course-cb').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.course-cb').forEach(cb => { cb.checked = false; toggleGradoSelector(cb); });
   updateCourseCounter();
 }
 

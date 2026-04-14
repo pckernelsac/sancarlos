@@ -11,21 +11,10 @@ from app.utils.scope import user_allowed_grados, user_allowed_niveles
 
 
 def _docente_niveles_grados(user: User) -> tuple[list[str], list[str]]:
-    """Replica el alcance académico usado en listados de docentes."""
-    niveles: set[str] = set()
-    grados: set[str] = set()
-    if user.nivel:
-        niveles.add(user.nivel)
-    if user.grado:
-        grados.add(user.grado)
-    course_ids = user.assigned_course_ids()
-    if course_ids:
-        courses = Course.query.filter(Course.id.in_(list(course_ids))).all()
-        for c in courses:
-            if c.nivel:
-                niveles.add(c.nivel)
-            if c.grado:
-                grados.add(c.grado)
+    """Replica el alcance académico usado en listados de docentes.
+    Considera las restricciones de grado en TeacherCourse.grados."""
+    from app.utils.scope import _docente_scope_from_courses
+    niveles, grados = _docente_scope_from_courses(user)
     return list(niveles), list(grados)
 
 
@@ -67,6 +56,7 @@ def can_grade_student(user: User, student, course_id: int | None = None) -> bool
     """
     Calificar o registrar evaluaciones para el estudiante.
     ADMIN siempre; DOCENTE con curso asignado coherente con nivel/grado del alumno.
+    Respeta TeacherCourse.grados (restricción de grados por docente).
     """
     if not getattr(user, "is_authenticated", False) or user.role is None:
         return False
@@ -83,6 +73,10 @@ def can_grade_student(user: User, student, course_id: int | None = None) -> bool
         if not course or course.nivel != student.nivel:
             return False
         if course.grado is not None and course.grado != student.grado:
+            return False
+        # Verificar restricción de grados en TeacherCourse
+        allowed_grados = user.allowed_grados_for_course(course_id)
+        if allowed_grados is not None and student.grado not in allowed_grados:
             return False
     return can_view_student(user, student)
 

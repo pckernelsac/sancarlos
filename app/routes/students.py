@@ -28,20 +28,8 @@ _SEARCH_Q_MAX = 120
 
 
 def _docente_scope(user):
-    niveles = set()
-    grados = set()
-    if user.nivel:
-        niveles.add(user.nivel)
-    if user.grado:
-        grados.add(user.grado)
-    course_ids = user.assigned_course_ids()
-    if course_ids:
-        courses = Course.query.filter(Course.id.in_(course_ids)).all()
-        for c in courses:
-            if c.nivel:
-                niveles.add(c.nivel)
-            if c.grado:
-                grados.add(c.grado)
+    from app.utils.scope import _docente_scope_from_courses
+    niveles, grados = _docente_scope_from_courses(user)
     return (list(niveles), list(grados))
 
 

@@ -10,7 +10,9 @@ class RoleEnum(str, enum.Enum):
 
 
 class TeacherCourse(db.Model):
-    """Asignación de cursos a docentes. ADMIN ignora esta tabla."""
+    """Asignación de cursos a docentes. ADMIN ignora esta tabla.
+    ``grados`` restringe los grados que cubre el docente para ese curso.
+    Almacena grados separados por coma (e.g. "1,2,3") o NULL = todos."""
     __tablename__ = "teacher_courses"
     __table_args__ = (
         db.UniqueConstraint("user_id", "course_id", name="uq_teacher_course"),
@@ -19,6 +21,13 @@ class TeacherCourse(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     user_id   = db.Column(db.Integer, db.ForeignKey("users.id",   ondelete="CASCADE"), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    grados    = db.Column(db.String(40), nullable=True)  # "1,2,3" o NULL=todos
+
+    def grados_set(self) -> set[str] | None:
+        """Retorna set de grados permitidos, o None si cubre todos."""
+        if not self.grados:
+            return None
+        return {g.strip() for g in self.grados.split(",") if g.strip()}
 
 
 class User(db.Model):
@@ -61,6 +70,18 @@ class User(db.Model):
     def assigned_course_ids(self) -> set[int]:
         """Conjunto de course_id asignados al docente."""
         return {tc.course_id for tc in self.assigned_courses.all()}
+
+    def allowed_grados_for_course(self, course_id: int) -> set[str] | None:
+        """Grados que el docente puede cubrir para un curso.
+        Retorna None si cubre todos los grados."""
+        tc = self.assigned_courses.filter_by(course_id=course_id).first()
+        if not tc:
+            return set()  # no tiene el curso asignado
+        return tc.grados_set()
+
+    def teacher_course_map(self) -> dict[int, set[str] | None]:
+        """Dict {course_id: set de grados o None} para todos los cursos asignados."""
+        return {tc.course_id: tc.grados_set() for tc in self.assigned_courses.all()}
 
     def __repr__(self):
         return f"<User {self.username} [{self.role.value}]>"

@@ -40,7 +40,8 @@ async def new_user_page(request: Request, current_user: User = Depends(require_r
     all_courses = Course.query.order_by(Course.nivel, Course.area, Course.nombre).all()
     from app.models.student import GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
     return render(request, "admin/user_form.html", user=None, roles=RoleEnum,
-                  all_courses=all_courses, assigned_ids=set(), niveles=NIVELES,
+                  all_courses=all_courses, assigned_ids=set(),
+                  assigned_grados_map={}, niveles=NIVELES,
                   grados_map={"INICIAL": GRADOS_INICIAL, "PRIMARIA": GRADOS_PRIMARIA, "SECUNDARIA": GRADOS_SECUNDARIA})
 
 
@@ -63,7 +64,9 @@ async def new_user_submit(request: Request, current_user: User = Depends(require
         if user.role == RoleEnum.DOCENTE:
             selected_ids = set(int(x) for x in form.getlist("course_ids"))
             for cid in selected_ids:
-                db.session.add(TeacherCourse(user_id=user.id, course_id=cid))
+                grados_list = form.getlist(f"course_grados_{cid}")
+                grados_val = ",".join(grados_list) if grados_list else None
+                db.session.add(TeacherCourse(user_id=user.id, course_id=cid, grados=grados_val))
 
         db.session.commit()
         flash(request, "Usuario creado correctamente.", "success")
@@ -79,7 +82,8 @@ async def new_user_submit(request: Request, current_user: User = Depends(require
     all_courses = Course.query.order_by(Course.nivel, Course.area, Course.nombre).all()
     from app.models.student import GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
     return render(request, "admin/user_form.html", user=None, roles=RoleEnum,
-                  all_courses=all_courses, assigned_ids=set(), niveles=NIVELES,
+                  all_courses=all_courses, assigned_ids=set(),
+                  assigned_grados_map={}, niveles=NIVELES,
                   grados_map={"INICIAL": GRADOS_INICIAL, "PRIMARIA": GRADOS_PRIMARIA, "SECUNDARIA": GRADOS_SECUNDARIA})
 
 
@@ -92,8 +96,10 @@ async def edit_user_page(user_id: int, request: Request, current_user: User = De
     all_courses = Course.query.order_by(Course.nivel, Course.area, Course.nombre).all()
     from app.models.student import GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
     assigned_ids = user.assigned_course_ids() if user.role == RoleEnum.DOCENTE else set()
+    assigned_grados_map = user.teacher_course_map() if user.role == RoleEnum.DOCENTE else {}
     return render(request, "admin/user_form.html", user=user, roles=RoleEnum,
-                  all_courses=all_courses, assigned_ids=assigned_ids, niveles=NIVELES,
+                  all_courses=all_courses, assigned_ids=assigned_ids,
+                  assigned_grados_map=assigned_grados_map, niveles=NIVELES,
                   grados_map={"INICIAL": GRADOS_INICIAL, "PRIMARIA": GRADOS_PRIMARIA, "SECUNDARIA": GRADOS_SECUNDARIA})
 
 
@@ -117,7 +123,9 @@ async def edit_user_submit(user_id: int, request: Request, current_user: User = 
         if user.role == RoleEnum.DOCENTE:
             selected_ids = set(int(x) for x in form.getlist("course_ids"))
             for cid in selected_ids:
-                db.session.add(TeacherCourse(user_id=user.id, course_id=cid))
+                grados_list = form.getlist(f"course_grados_{cid}")
+                grados_val = ",".join(grados_list) if grados_list else None
+                db.session.add(TeacherCourse(user_id=user.id, course_id=cid, grados=grados_val))
 
         db.session.commit()
         flash(request, "Usuario actualizado.", "success")
@@ -133,8 +141,10 @@ async def edit_user_submit(user_id: int, request: Request, current_user: User = 
     all_courses = Course.query.order_by(Course.nivel, Course.area, Course.nombre).all()
     from app.models.student import GRADOS_INICIAL, GRADOS_PRIMARIA, GRADOS_SECUNDARIA
     assigned_ids = user.assigned_course_ids() if user.role == RoleEnum.DOCENTE else set()
+    assigned_grados_map = user.teacher_course_map() if user.role == RoleEnum.DOCENTE else {}
     return render(request, "admin/user_form.html", user=user, roles=RoleEnum,
-                  all_courses=all_courses, assigned_ids=assigned_ids, niveles=NIVELES,
+                  all_courses=all_courses, assigned_ids=assigned_ids,
+                  assigned_grados_map=assigned_grados_map, niveles=NIVELES,
                   grados_map={"INICIAL": GRADOS_INICIAL, "PRIMARIA": GRADOS_PRIMARIA, "SECUNDARIA": GRADOS_SECUNDARIA})
 
 

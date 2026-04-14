@@ -13,23 +13,66 @@ GRADOS_POR_NIVEL = {
 
 def _docente_scope_from_courses(user):
     """Deriva niveles y grados del docente a partir de sus cursos asignados
-    (y opcionalmente de user.nivel / user.grado como fallback)."""
+    y las restricciones de grado en TeacherCourse.
+    Retorna (set_niveles, set_grados)."""
     from app.models.academic import Course
     niveles: set[str] = set()
     grados: set[str] = set()
-    if user.nivel:
-        niveles.add(user.nivel)
-    if user.grado:
-        grados.add(user.grado)
-    course_ids = user.assigned_course_ids()
-    if course_ids:
-        courses = Course.query.filter(Course.id.in_(list(course_ids))).all()
+    has_all_grados_for_nivel: set[str] = set()  # niveles donde cubre todos los grados
+
+    tc_map = user.teacher_course_map()  # {course_id: set_grados | None}
+    if tc_map:
+        course_ids = list(tc_map.keys())
+        courses = Course.query.filter(Course.id.in_(course_ids)).all()
         for c in courses:
             if c.nivel:
                 niveles.add(c.nivel)
-            if c.grado:
+            tc_grados = tc_map.get(c.id)  # restricción del docente
+            if tc_grados is not None:
+                # Docente tiene grados específicos para este curso
+                grados.update(tc_grados)
+            elif c.grado:
+                # Curso tiene grado fijo
                 grados.add(c.grado)
+            else:
+                # Curso sin grado fijo + sin restricción de docente → todos los grados del nivel
+                has_all_grados_for_nivel.add(c.nivel)
+
+    # Si tiene un nivel donde cubre todos los grados, añadirlos
+    for niv in has_all_grados_for_nivel:
+        grados.update(GRADOS_POR_NIVEL.get(niv, []))
+
     return niveles, grados
+
+
+def _docente_allowed_grados_for_nivel(user, nivel):
+    """Grados que el docente puede ver para un nivel específico,
+    derivados de sus cursos asignados y restricciones TeacherCourse.grados."""
+    from app.models.academic import Course
+    grados: set[str] = set()
+    tc_map = user.teacher_course_map()
+    if not tc_map:
+        return GRADOS_POR_NIVEL.get(nivel or "PRIMARIA", GRADOS_PRIMARIA)
+
+    course_ids = list(tc_map.keys())
+    courses = Course.query.filter(
+        Course.id.in_(course_ids), Course.nivel == nivel
+    ).all()
+
+    for c in courses:
+        tc_grados = tc_map.get(c.id)
+        if tc_grados is not None:
+            grados.update(tc_grados)
+        elif c.grado:
+            grados.add(c.grado)
+        else:
+            # Curso sin grado + sin restricción → todos los grados
+            return GRADOS_POR_NIVEL.get(nivel, GRADOS_PRIMARIA)
+
+    if grados:
+        all_grados = GRADOS_POR_NIVEL.get(nivel or "PRIMARIA", GRADOS_PRIMARIA)
+        return [g for g in all_grados if g in grados]
+    return GRADOS_POR_NIVEL.get(nivel or "PRIMARIA", GRADOS_PRIMARIA)
 
 
 def user_allowed_niveles(current_user=None):
@@ -53,15 +96,10 @@ def user_allowed_niveles(current_user=None):
 
 def user_allowed_grados(nivel=None, current_user=None):
     """Grados visibles para el usuario según el nivel.
-    DOCENTE: derivado de cursos asignados para el nivel dado.
+    DOCENTE: derivado de cursos asignados + restricción TeacherCourse.grados.
     AUXILIAR con grado asignado ve solo ese grado."""
     if current_user and current_user.role == RoleEnum.DOCENTE:
-        _, grados = _docente_scope_from_courses(current_user)
-        if grados:
-            all_grados = GRADOS_POR_NIVEL.get(nivel or "PRIMARIA", GRADOS_PRIMARIA)
-            filtered = [g for g in all_grados if g in grados]
-            return filtered if filtered else all_grados
-        return GRADOS_POR_NIVEL.get(nivel or "PRIMARIA", GRADOS_PRIMARIA)
+        return _docente_allowed_grados_for_nivel(current_user, nivel)
     if current_user and current_user.role == RoleEnum.AUXILIAR and current_user.grado:
         return [current_user.grado]
     if current_user:
