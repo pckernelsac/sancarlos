@@ -21,7 +21,7 @@ router = APIRouter(tags=["parents"])
 
 
 @router.get("/", name="parents.index")
-async def index(request: Request, current_user: User = Depends(require_role("ADMIN", "AUXILIAR"))):
+async def index(request: Request, current_user: User = Depends(require_role("ADMIN", "AUXILIAR", "DOCENTE", niveles=("INICIAL", "PRIMARIA")))):
     anio = int(request.query_params.get("anio", datetime.date.today().year))
     nivel, grado = sanitize_nivel_grado(
         request.query_params.get("nivel", "PRIMARIA"),
@@ -64,7 +64,7 @@ async def index(request: Request, current_user: User = Depends(require_role("ADM
 
 
 @router.post("/save", name="parents.save")
-async def save(request: Request, current_user: User = Depends(require_role("ADMIN", "AUXILIAR"))):
+async def save(request: Request, current_user: User = Depends(require_role("ADMIN", "AUXILIAR", "DOCENTE", niveles=("INICIAL", "PRIMARIA")))):
     try:
         data = ParentSavePayload.model_validate(await request.json())
     except ValidationError:

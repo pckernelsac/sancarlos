@@ -46,13 +46,19 @@ def require_login(request: Request) -> User:
     return user
 
 
-def require_role(*roles):
-    """Factory de dependencias que requiere roles específicos. ADMIN siempre tiene acceso."""
+def require_role(*roles, niveles: tuple[str, ...] | None = None):
+    """Factory de dependencias que requiere roles específicos. ADMIN siempre tiene acceso.
+
+    Si se pasa *niveles*, los usuarios con rol DOCENTE solo son aceptados
+    cuando su ``nivel`` está en la tupla indicada.
+    """
     def dependency(request: Request) -> User:
         user = require_login(request)
         if user.role.value == "ADMIN":
             return user
         if user.role.value not in roles:
+            raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta página.")
+        if niveles and user.role.value == "DOCENTE" and user.nivel not in niveles:
             raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta página.")
         return user
     return dependency
