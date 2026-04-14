@@ -3,9 +3,19 @@ Generador de Boleta de Notas INICIAL usando fpdf2.
 Layout similar a primaria pero adaptado para nivel inicial (3, 4, 5 años).
 Dimensiones en mm. Ancho útil A4 = 190 mm.
 """
+import unicodedata
 from fpdf import FPDF
 
 from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
+
+
+def _normalize(s: str) -> str:
+    """Normaliza un nombre de curso: quita tildes, espacios extra, pasa a mayúsculas."""
+    s = s.strip().upper()
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+    )
 
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 BRAND       = (14,  47, 119)   # #0e2f77
@@ -234,8 +244,7 @@ class BoletaInicialPDF(FPDF):
 
         name_index: dict[str, tuple] = {}
         for cid, data in matrix.items():
-            key = data['course'].nombre.strip().upper()
-            name_index[key] = (cid, data)
+            name_index[_normalize(data['course'].nombre)] = (cid, data)
 
         y0 = self.get_y()
         y_row2 = y0 + HR1
@@ -266,10 +275,11 @@ class BoletaInicialPDF(FPDF):
 
         self.set_xy(ML, y_data)
 
+        rendered_cids: set[int] = set()
         for area_display, course_names in BOLETA_LAYOUT:
             found = []
             for cn in course_names:
-                key = cn.strip().upper()
+                key = _normalize(cn)
                 if key in name_index:
                     found.append(name_index[key])
 
@@ -281,6 +291,7 @@ class BoletaInicialPDF(FPDF):
 
             if n == 1:
                 cid, data = found[0]
+                rendered_cids.add(cid)
                 self.set_xy(ML, y_area)
                 self._dcell(AW + CW, RH, area_display, bg=AREA_BG, bold=True,
                             align='L', size=8)
@@ -290,11 +301,24 @@ class BoletaInicialPDF(FPDF):
                 area_h = n * RH
                 self._draw_area_cell(ML, y_area, AW, area_h, area_display)
                 for idx, (cid, data) in enumerate(found):
+                    rendered_cids.add(cid)
                     row_y = y_area + idx * RH
                     self.set_xy(ML + AW, row_y)
                     self._dcell(CW, RH, data['course'].nombre, align='L', size=8)
                     self._draw_course_grades_row(cid, data, terms, eda_data)
                 self.set_xy(ML, y_area + area_h)
+
+        # ── Cursos en el matrix que no estaban en el layout
+        for cid, data in matrix.items():
+            if cid in rendered_cids:
+                continue
+            y_area = self.get_y()
+            self.set_xy(ML, y_area)
+            area_label = (data['course'].area or data['course'].nombre).upper()
+            self._dcell(AW + CW, RH, area_label, bg=AREA_BG, bold=True,
+                        align='L', size=8)
+            self._draw_course_grades_row(cid, data, terms, eda_data)
+            self.set_xy(ML, y_area + RH)
 
         self.ln(1.5)
 
