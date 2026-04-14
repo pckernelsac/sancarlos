@@ -101,9 +101,10 @@ cursos_primaria_por_grado = {
         ("ESTADÍSTICA",          "Matemática"),
         ("CIENCIA Y TECNOLOGÍA", "Ciencia y Tecnología"),
     ],
-    # 3°: comunes + ÁLGEBRA
+    # 3°: comunes + ÁLGEBRA, CIENCIA Y TECNOLOGÍA
     "3": [
         ("ÁLGEBRA",              "Matemática"),
+        ("CIENCIA Y TECNOLOGÍA", "Ciencia y Tecnología"),
     ],
     # 4°: comunes + ÁLGEBRA, ESTADÍSTICA, CIENCIA Y TECNOLOGÍA
     "4": [

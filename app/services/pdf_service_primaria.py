@@ -303,10 +303,11 @@ class BoletaPrimariaPDF(FPDF):
         nt = len(terms)
         bim_names = ['I BIMESTRE', 'II BIMESTRE', 'III BIMESTRE', 'IV BIMESTRE']
 
-        # ── Índice: nombre_curso → (course_id, data) ────────────────────────
+        # ── Índice: NOMBRE_CURSO (normalizado) → (course_id, data) ──────────
         name_index: dict[str, tuple] = {}
         for cid, data in matrix.items():
-            name_index[data['course'].nombre] = (cid, data)
+            key = data['course'].nombre.strip().upper()
+            name_index[key] = (cid, data)
 
         # ── Header — posiciones explícitas ──────────────────────────────────
         y0 = self.get_y()                      # inicio del header
@@ -347,8 +348,9 @@ class BoletaPrimariaPDF(FPDF):
         for area_display, course_names in boleta_layout:
             found = []
             for cn in course_names:
-                if cn in name_index:
-                    found.append(name_index[cn])
+                key = cn.strip().upper()
+                if key in name_index:
+                    found.append(name_index[key])
 
             if not found:
                 continue

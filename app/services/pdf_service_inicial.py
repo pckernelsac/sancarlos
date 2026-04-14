@@ -234,7 +234,8 @@ class BoletaInicialPDF(FPDF):
 
         name_index: dict[str, tuple] = {}
         for cid, data in matrix.items():
-            name_index[data['course'].nombre] = (cid, data)
+            key = data['course'].nombre.strip().upper()
+            name_index[key] = (cid, data)
 
         y0 = self.get_y()
         y_row2 = y0 + HR1
@@ -268,8 +269,9 @@ class BoletaInicialPDF(FPDF):
         for area_display, course_names in BOLETA_LAYOUT:
             found = []
             for cn in course_names:
-                if cn in name_index:
-                    found.append(name_index[cn])
+                key = cn.strip().upper()
+                if key in name_index:
+                    found.append(name_index[key])
 
             if not found:
                 continue
