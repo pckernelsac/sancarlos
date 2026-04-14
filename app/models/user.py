@@ -83,5 +83,15 @@ class User(db.Model):
         """Dict {course_id: set de grados o None} para todos los cursos asignados."""
         return {tc.course_id: tc.grados_set() for tc in self.assigned_courses.all()}
 
+    def course_ids_for_grado(self, grado: str) -> set[int]:
+        """Course IDs que el docente puede ver/calificar para un grado específico.
+        Filtra por la restricción TeacherCourse.grados."""
+        result = set()
+        for tc in self.assigned_courses.all():
+            gs = tc.grados_set()
+            if gs is None or grado in gs:
+                result.add(tc.course_id)
+        return result
+
     def __repr__(self):
         return f"<User {self.username} [{self.role.value}]>"

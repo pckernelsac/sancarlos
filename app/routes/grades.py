@@ -77,13 +77,20 @@ async def matrix(request: Request, current_user: User = Depends(require_role("AD
     grade_map = {}
     avg_map = {}
 
-    allowed_ids = None
+    all_allowed_ids = None
     if current_user.has_role("DOCENTE"):
-        allowed_ids = current_user.assigned_course_ids()
+        all_allowed_ids = current_user.assigned_course_ids()
 
-    niveles_permitidos = _docente_niveles(allowed_ids)
+    niveles_permitidos = _docente_niveles(all_allowed_ids)
     if nivel not in niveles_permitidos and niveles_permitidos:
         nivel = niveles_permitidos[0]
+
+    # allowed_ids filtrado por grado (para cursos multi-grado)
+    allowed_ids = None
+    if current_user.has_role("DOCENTE") and grado:
+        allowed_ids = current_user.course_ids_for_grado(grado)
+    elif current_user.has_role("DOCENTE"):
+        allowed_ids = all_allowed_ids
 
     if grado and seccion and term_id:
         selected_term = Term.query.get(term_id)
@@ -187,13 +194,20 @@ async def eda_matrix(request: Request, current_user: User = Depends(require_role
     terms = Term.query.filter_by(anio=anio).order_by(Term.orden).all()
     data = {}
 
-    allowed_ids = None
+    all_allowed_ids = None
     if current_user.has_role("DOCENTE"):
-        allowed_ids = current_user.assigned_course_ids()
+        all_allowed_ids = current_user.assigned_course_ids()
 
-    niveles_permitidos = _docente_niveles(allowed_ids)
+    niveles_permitidos = _docente_niveles(all_allowed_ids)
     if nivel not in niveles_permitidos and niveles_permitidos:
         nivel = niveles_permitidos[0]
+
+    # Filtrar por grado para cursos multi-grado
+    allowed_ids = None
+    if current_user.has_role("DOCENTE") and grado:
+        allowed_ids = current_user.course_ids_for_grado(grado)
+    elif current_user.has_role("DOCENTE"):
+        allowed_ids = all_allowed_ids
 
     if grado and seccion and term_id:
         data = get_eda_matrix_data(grado, seccion, term_id, nivel=nivel, allowed_course_ids=allowed_ids)
@@ -340,13 +354,20 @@ async def registro_auxiliar(request: Request, current_user: User = Depends(requi
     edas = []
     courses_list = []
 
-    allowed_ids = None
+    all_allowed_ids = None
     if current_user.has_role("DOCENTE"):
-        allowed_ids = current_user.assigned_course_ids()
+        all_allowed_ids = current_user.assigned_course_ids()
 
-    niveles_permitidos = _docente_niveles(allowed_ids)
+    niveles_permitidos = _docente_niveles(all_allowed_ids)
     if nivel not in niveles_permitidos and niveles_permitidos:
         nivel = niveles_permitidos[0]
+
+    # Filtrar por grado para cursos multi-grado
+    allowed_ids = None
+    if current_user.has_role("DOCENTE") and grado:
+        allowed_ids = current_user.course_ids_for_grado(grado)
+    elif current_user.has_role("DOCENTE"):
+        allowed_ids = all_allowed_ids
 
     if term_id:
         edas = EDA.query.filter_by(term_id=term_id).order_by(EDA.orden).all()
@@ -385,6 +406,12 @@ async def registro_auxiliar_detail(eda_id: int, course_id: int, request: Request
     if not current_user.can_grade_course(course_id):
         raise HTTPException(status_code=403)
 
+    # Verificar restricción de grados para el docente en este curso
+    if current_user.has_role("DOCENTE"):
+        allowed_grados = current_user.allowed_grados_for_course(course_id)
+        if allowed_grados is not None and grado not in allowed_grados:
+            raise HTTPException(status_code=403)
+
     data = get_registro_full(eda_id, course_id, grado, seccion)
     if not data:
         raise HTTPException(status_code=404)
@@ -407,6 +434,10 @@ async def registro_auxiliar_export_pdf(eda_id: int, course_id: int, request: Req
         raise HTTPException(status_code=400)
     if not current_user.can_grade_course(course_id):
         raise HTTPException(status_code=403)
+    if current_user.has_role("DOCENTE"):
+        allowed_grados = current_user.allowed_grados_for_course(course_id)
+        if allowed_grados is not None and grado not in allowed_grados:
+            raise HTTPException(status_code=403)
     data = get_registro_full(eda_id, course_id, grado, seccion)
     if not data:
         raise HTTPException(status_code=404)
@@ -435,17 +466,24 @@ async def registro_auxiliar_export_zip(request: Request, current_user: User = De
     if not grado or not term_id:
         raise HTTPException(status_code=400)
 
-    allowed_ids = None
+    all_allowed_ids = None
     if current_user.has_role("DOCENTE"):
-        allowed_ids = current_user.assigned_course_ids()
+        all_allowed_ids = current_user.assigned_course_ids()
 
-    niveles_permitidos = _docente_niveles(allowed_ids)
+    niveles_permitidos = _docente_niveles(all_allowed_ids)
     if nivel not in niveles_permitidos and niveles_permitidos:
         raise HTTPException(status_code=403)
 
     term = Term.query.get(term_id)
     if not term or term.anio != anio:
         raise HTTPException(status_code=400)
+
+    # Filtrar por grado para cursos multi-grado
+    allowed_ids = None
+    if current_user.has_role("DOCENTE") and grado:
+        allowed_ids = current_user.course_ids_for_grado(grado)
+    elif current_user.has_role("DOCENTE"):
+        allowed_ids = all_allowed_ids
 
     all_courses = Course.query.filter(
         Course.nivel == nivel,
