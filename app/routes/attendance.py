@@ -10,7 +10,7 @@ from app.utils.safe_errors import log_unexpected_exc, GENERIC_USER_MESSAGE
 from app.services.attendance_service import upsert_attendance, get_class_attendance_month
 from app.models.academic import MESES
 from app.models.user import User
-from app.utils.scope import user_allowed_grados, user_allowed_niveles, sanitize_nivel_grado
+from app.utils.scope import sanitize_nivel_grado_convivencia, convivencia_allowed_niveles, convivencia_allowed_grados
 from app import render
 import datetime
 
@@ -20,7 +20,7 @@ router = APIRouter(tags=["attendance"])
 @router.get("/", name="attendance.index")
 async def index(request: Request, current_user: User = Depends(require_role("ADMIN", "AUXILIAR", "DOCENTE", niveles=("INICIAL", "PRIMARIA")))):
     anio = int(request.query_params.get("anio", datetime.date.today().year))
-    nivel, grado = sanitize_nivel_grado(
+    nivel, grado = sanitize_nivel_grado_convivencia(
         request.query_params.get("nivel", "PRIMARIA"),
         request.query_params.get("grado", ""),
         current_user,
@@ -34,8 +34,8 @@ async def index(request: Request, current_user: User = Depends(require_role("ADM
 
     return render(
         request, "attendance/index.html",
-        niveles=user_allowed_niveles(current_user), nivel=nivel,
-        grados=user_allowed_grados(nivel, current_user), secciones=SECCIONES, meses=MESES,
+        niveles=convivencia_allowed_niveles(current_user), nivel=nivel,
+        grados=convivencia_allowed_grados(nivel, current_user), secciones=SECCIONES, meses=MESES,
         grado=grado, seccion=seccion, mes=mes,
         anio=anio, rows=rows,
     )

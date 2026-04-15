@@ -119,3 +119,36 @@ def sanitize_nivel_grado(nivel_req, grado_req, current_user=None):
     grado = grado_req if grado_req in grados else ""
 
     return nivel, grado
+
+
+# ---------------------------------------------------------------------------
+# Convivencia: DOCENTE solo ve su nivel y grado asignado (no los de cursos)
+# ---------------------------------------------------------------------------
+
+def convivencia_allowed_niveles(current_user=None):
+    """Niveles para convivencia: DOCENTE usa su nivel directo, no el de cursos."""
+    if current_user and current_user.role == RoleEnum.DOCENTE:
+        return [current_user.nivel] if current_user.nivel else []
+    return user_allowed_niveles(current_user)
+
+
+def convivencia_allowed_grados(nivel=None, current_user=None):
+    """Grados para convivencia: DOCENTE usa su grado directo, no el de cursos."""
+    if current_user and current_user.role == RoleEnum.DOCENTE:
+        if current_user.grado:
+            return [current_user.grado]
+        return GRADOS_POR_NIVEL.get(nivel or "PRIMARIA", GRADOS_PRIMARIA)
+    return user_allowed_grados(nivel, current_user)
+
+
+def sanitize_nivel_grado_convivencia(nivel_req, grado_req, current_user=None):
+    """Valida nivel/grado para convivencia. DOCENTE restringido a su asignación directa."""
+    niveles = convivencia_allowed_niveles(current_user)
+    if not niveles:
+        return nivel_req, ""
+    nivel = nivel_req if nivel_req in niveles else niveles[0]
+
+    grados = convivencia_allowed_grados(nivel, current_user)
+    grado = grado_req if grado_req in grados else (grados[0] if grados else "")
+
+    return nivel, grado
