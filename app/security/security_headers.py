@@ -7,7 +7,7 @@ from starlette.responses import Response
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     Añade CSP, anti-clickjacking, nosniff y Referrer-Policy.
-    CSP por defecto alineada con base.html (Tailwind CDN + scripts inline).
+    CSP por defecto alineada con base.html (Tailwind local + scripts inline).
     """
 
     def __init__(self, app, content_security_policy: str | None = None):
@@ -21,8 +21,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "font-src 'self' data:; "
             "connect-src 'self'; "
             # dashboard.html y consolidado cargan Chart.js desde jsDelivr
-            "script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com;"
+            "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline';"
         )
 
     async def dispatch(self, request: Request, call_next) -> Response:

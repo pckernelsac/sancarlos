@@ -16,3 +16,4 @@ migrations/versions/
 startup_log.txt
 tmp/
 *.zip
+node_modules/

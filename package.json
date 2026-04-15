@@ -1,0 +1,25 @@
+{
+  "name": "sancarlosv0",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "tailwindcss -i app/static/css/input.css -o app/static/css/tailwind.css --content \"app/templates/**/*.html\" -m",
+    "watch:css": "tailwindcss -i app/static/css/input.css -o app/static/css/tailwind.css --content \"app/templates/**/*.html\" --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pckernelsac/sancarlos.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/pckernelsac/sancarlos/issues"
+  },
+  "homepage": "https://github.com/pckernelsac/sancarlos#readme",
+  "description": "",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "tailwindcss": "^4.2.2"
+  }
+}
