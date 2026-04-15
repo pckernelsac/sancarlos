@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build:css": "tailwindcss -i app/static/css/input.css -o app/static/css/tailwind.css --content \"app/templates/**/*.html\" -m",
-    "watch:css": "tailwindcss -i app/static/css/input.css -o app/static/css/tailwind.css --content \"app/templates/**/*.html\" --watch"
+    "build:css": "tailwindcss -i app/static/css/input.css -o app/static/css/tailwind.css --content \"app/templates/**/*.html\" --content \"app/static/js/**/*.js\" -m",
+    "watch:css": "tailwindcss -i app/static/css/input.css -o app/static/css/tailwind.css --content \"app/templates/**/*.html\" --content \"app/static/js/**/*.js\" --watch"
   },
   "repository": {
     "type": "git",
