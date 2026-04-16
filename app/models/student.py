@@ -29,6 +29,7 @@ class Student(db.Model):
     grades = db.relationship("Grade", backref="student", lazy="dynamic", cascade="all, delete-orphan")
     attendance = db.relationship("Attendance", backref="student", lazy="dynamic", cascade="all, delete-orphan")
     behavior = db.relationship("Behavior", backref="student", lazy="dynamic", cascade="all, delete-orphan")
+    behavior_monthly = db.relationship("BehaviorMonthly", backref="student", lazy="dynamic", cascade="all, delete-orphan")
     parent_responsibility = db.relationship("ParentResponsibility", backref="student", lazy="dynamic", cascade="all, delete-orphan")
 
     @property
