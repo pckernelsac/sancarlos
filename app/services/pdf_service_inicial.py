@@ -353,9 +353,10 @@ class BoletaInicialPDF(FPDF):
         # ── Escala
         self._hcell(sw, 4.5, 'ESCALA DE VALORES', nx='LMARGIN', ny='NEXT')
         scale_rows = [
-            ('DE 14 A 20', 'LOGRO PREVISTO', 'A'),
-            ('DE 11 A 13', 'EN PROCESO',      'B'),
-            ('DE 00 A 10', 'EN INICIO',        'C'),
+            ('DE 18 A 20', 'LOGRO DESTACADO',  'AD'),
+            ('DE 14 A 17', 'LOGRO PREVISTO',    'A'),
+            ('DE 11 A 13', 'EN PROCESO',        'B'),
+            ('DE 00 A 10', 'EN INICIO',         'C'),
         ]
         for rng, desc, q in scale_rows:
             b = BADGE.get(q, {'bg': WHITE, 'fg': BLACK})
@@ -413,7 +414,7 @@ class BoletaInicialPDF(FPDF):
                   new_x='LMARGIN', new_y='NEXT')
         self._reset()
 
-        scale_h = 4.5 + RH * 3
+        scale_h = 4.5 + RH * 4
         att_h   = 4.5 + RH * 2 + 0.6 + h_box
         self.set_y(y0 + max(scale_h, att_h) + 2)
         self.ln(1)
