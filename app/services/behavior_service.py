@@ -1,11 +1,105 @@
 from app.database import db
 from app.models.academic import (
-    Behavior, Term, EDA, INDICADORES_CONDUCTA, INDICADORES_CONDUCTA_SECUNDARIA
+    Behavior, BehaviorMonthly, Term, EDA,
+    INDICADORES_CONDUCTA, INDICADORES_CONDUCTA_SECUNDARIA, MESES,
 )
 from app.services.grade_service import _round_half_up, numeric_to_qualitative
 
 _ALL_INDICADORES = set(INDICADORES_CONDUCTA) | set(INDICADORES_CONDUCTA_SECUNDARIA)
 
+
+# ── Monthly behavior (new) ───────────────────────────────────────────────────
+
+def upsert_behavior_monthly(student_id: int, indicador: str, mes: str, anio: int, calificacion) -> BehaviorMonthly:
+    if indicador not in _ALL_INDICADORES:
+        raise ValueError(f"Indicador no válido: {indicador}")
+    if mes not in MESES:
+        raise ValueError(f"Mes no válido: {mes}")
+
+    if calificacion in (None, "", "--"):
+        cal = None
+    else:
+        try:
+            cal = int(calificacion)
+        except (ValueError, TypeError):
+            raise ValueError("Calificación de conducta no válida.")
+        if cal < 0 or cal > 20:
+            raise ValueError("La calificación debe estar entre 0 y 20.")
+
+    record = BehaviorMonthly.query.filter_by(
+        student_id=student_id, indicador=indicador, mes=mes, anio=anio
+    ).first()
+    if record:
+        record.calificacion = cal
+    else:
+        record = BehaviorMonthly(
+            student_id=student_id, indicador=indicador,
+            mes=mes, anio=anio, calificacion=cal,
+        )
+        db.session.add(record)
+    db.session.commit()
+    return record
+
+
+def get_student_behavior_by_month(student_id: int, mes: str, anio: int) -> dict:
+    """Retorna {indicador: BehaviorMonthly} para un mes específico."""
+    records = BehaviorMonthly.query.filter_by(
+        student_id=student_id, mes=mes, anio=anio
+    ).all()
+    return {r.indicador: r for r in records}
+
+
+def get_student_behavior_all_months(student_id: int, anio: int) -> dict:
+    """Retorna {mes: {indicador: BehaviorMonthly}} para el PDF."""
+    records = BehaviorMonthly.query.filter_by(
+        student_id=student_id, anio=anio
+    ).all()
+    result: dict[str, dict] = {}
+    for r in records:
+        result.setdefault(r.mes, {})[r.indicador] = r
+    return result
+
+
+def get_behavior_monthly_average(student_id: int, anio: int, nivel: str = "PRIMARIA") -> dict:
+    """Promedio de TODAS las calificaciones mensuales de conducta del año."""
+    records = BehaviorMonthly.query.filter_by(
+        student_id=student_id, anio=anio
+    ).all()
+    vals = [r.calificacion for r in records if r.calificacion is not None]
+    if not vals:
+        return {"promedio_num": None, "promedio_cual": "--"}
+    avg = _round_half_up(sum(vals) / len(vals))
+    return {
+        "promedio_num": avg,
+        "promedio_cual": numeric_to_qualitative(avg, nivel),
+    }
+
+
+def get_behavior_monthly_indicator_averages(student_id: int, anio: int, indicadores: list, nivel: str = "PRIMARIA") -> dict:
+    """Promedio por indicador (promedio de todos los meses del año)."""
+    records = BehaviorMonthly.query.filter_by(
+        student_id=student_id, anio=anio
+    ).all()
+    ind_vals: dict[str, list] = {}
+    for r in records:
+        if r.calificacion is not None:
+            ind_vals.setdefault(r.indicador, []).append(r.calificacion)
+
+    result = {}
+    for ind in indicadores:
+        vals = ind_vals.get(ind, [])
+        if vals:
+            avg = _round_half_up(sum(vals) / len(vals))
+            result[ind] = {
+                "promedio_num": avg,
+                "promedio_cual": numeric_to_qualitative(avg, nivel),
+            }
+        else:
+            result[ind] = {"promedio_num": None, "promedio_cual": "--"}
+    return result
+
+
+# ── Legacy EDA-based behavior (kept for compatibility) ───────────────────────
 
 def upsert_behavior(student_id: int, indicador: str, eda_id: int, calificacion) -> Behavior:
     if indicador not in _ALL_INDICADORES:
@@ -45,11 +139,7 @@ def get_student_behavior_by_eda(student_id: int, eda_id: int) -> dict:
 
 
 def get_student_behavior_all_terms(student_id: int, anio: int) -> dict:
-    """Retorna {term_id: {indicador: promedio_de_2_edas}} para el PDF.
-
-    Calcula el promedio de las 2 EDAs de cada bimestre por indicador.
-    Returns: {term_id: {indicador: Behavior-like}} donde cada entry tiene calificacion promediada.
-    """
+    """Retorna {term_id: {indicador: promedio_de_2_edas}} para el PDF."""
     term_ids = [t.id for t in Term.query.filter_by(anio=anio).all()]
     if not term_ids:
         return {}
@@ -59,9 +149,7 @@ def get_student_behavior_all_terms(student_id: int, anio: int) -> dict:
     if not eda_ids:
         return {}
 
-    # Mapear eda_id → term_id
     eda_term = {e.id: e.term_id for e in edas}
-    # Agrupar edas por term
     term_edas: dict[int, list[int]] = {}
     for e in edas:
         term_edas.setdefault(e.term_id, []).append(e.id)
@@ -71,16 +159,13 @@ def get_student_behavior_all_terms(student_id: int, anio: int) -> dict:
         Behavior.eda_id.in_(eda_ids),
     ).all()
 
-    # Agrupar: term_id → indicador → [calificaciones]
     term_ind_vals: dict[int, dict[str, list]] = {}
     for r in records:
         tid = eda_term[r.eda_id]
         if r.calificacion is not None:
             term_ind_vals.setdefault(tid, {}).setdefault(r.indicador, []).append(r.calificacion)
 
-    # Crear resultado con promedios por bimestre
     class _BehProxy:
-        """Proxy ligero que imita Behavior para el PDF."""
         def __init__(self, cal):
             self.calificacion = cal
         @property
@@ -105,7 +190,6 @@ def get_student_behavior_all_terms(student_id: int, anio: int) -> dict:
 
 
 def get_student_behavior(student_id: int, anio: int) -> dict:
-    """Compatibilidad: retorna {indicador: Behavior} con datos mergeados."""
     all_terms = get_student_behavior_all_terms(student_id, anio)
     merged = {}
     for term_data in all_terms.values():
@@ -116,10 +200,6 @@ def get_student_behavior(student_id: int, anio: int) -> dict:
 
 
 def get_behavior_average(student_id: int, anio: int, nivel: str = "PRIMARIA") -> dict:
-    """Promedio de TODAS las calificaciones de conducta (todas las EDAs del año).
-
-    Returns: dict con 'promedio_num' (int|None), 'promedio_cual' (str)
-    """
     term_ids = [t.id for t in Term.query.filter_by(anio=anio).all()]
     if not term_ids:
         return {"promedio_num": None, "promedio_cual": "--"}
@@ -143,10 +223,6 @@ def get_behavior_average(student_id: int, anio: int, nivel: str = "PRIMARIA") ->
 
 
 def get_behavior_indicator_averages(student_id: int, anio: int, indicadores: list, nivel: str = "PRIMARIA") -> dict:
-    """Promedio por indicador (promedio de todas las EDAs del año de ese indicador).
-
-    Returns: {indicador: {'promedio_num': int|None, 'promedio_cual': str}}
-    """
     term_ids = [t.id for t in Term.query.filter_by(anio=anio).all()]
     if not term_ids:
         return {ind: {"promedio_num": None, "promedio_cual": "--"} for ind in indicadores}
@@ -160,7 +236,6 @@ def get_behavior_indicator_averages(student_id: int, anio: int, indicadores: lis
         Behavior.eda_id.in_(eda_ids),
     ).all()
 
-    # Agrupar por indicador
     ind_vals: dict[str, list] = {}
     for r in records:
         if r.calificacion is not None:

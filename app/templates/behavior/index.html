@@ -10,7 +10,7 @@
   </div>
   <div>
     <h1 class="text-2xl font-bold text-brand">Registro de Conducta — {{ anio }}</h1>
-    <p class="text-sm text-gray-500">Evaluación de indicadores de comportamiento por EDA</p>
+    <p class="text-sm text-gray-500">Evaluación mensual de indicadores de comportamiento</p>
   </div>
 </div>
 
@@ -30,36 +30,18 @@
   </div>
   <input type="hidden" name="seccion" value="A">
   <div>
-    <label class="block text-xs font-semibold text-gray-600 mb-1">Bimestre</label>
-    <select name="term_id" id="sel-term" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none"
-            onchange="this.form.submit()">
-      <option value="">-- Bimestre --</option>
-      {% for t in terms %}<option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.nombre }}</option>{% endfor %}
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Mes</label>
+    <select name="mes" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
+      <option value="">-- Mes --</option>
+      {% for m in meses %}<option value="{{ m }}" {% if m==mes %}selected{% endif %}>{{ m }}</option>{% endfor %}
     </select>
   </div>
-  {% if edas %}
-  <div>
-    <label class="block text-xs font-semibold text-gray-600 mb-1">EDA</label>
-    <select name="eda_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:outline-none">
-      {% for e in edas %}<option value="{{ e.id }}" {% if e.id == eda_id %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
-    </select>
-  </div>
-  {% endif %}
   <input type="hidden" name="anio" value="{{ anio }}">
   <button type="submit" class="bg-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-light transition flex items-center gap-2">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
     Cargar
   </button>
 </form>
-
-{% if term_locked %}
-<div class="bg-red-50 border border-red-300 rounded-xl p-4 mb-4 flex items-center gap-3">
-  <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-  </svg>
-  <span class="text-sm font-semibold text-red-700">Este bimestre está bloqueado. Las calificaciones no pueden ser modificadas.</span>
-</div>
-{% endif %}
 
 {% if students_data %}
 <div id="beh-status" class="text-sm h-5 mb-2"></div>
@@ -83,13 +65,13 @@
         <td class="px-3 py-2 text-center">
           <div class="inline-flex items-center gap-1.5">
             <input type="number" min="0" max="20"
-                   class="beh-input border border-gray-200 rounded px-2 py-1.5 text-sm text-center w-16 focus:ring-2 focus:ring-brand focus:outline-none {% if term_locked %}bg-gray-100 cursor-not-allowed{% endif %}"
+                   class="beh-input border border-gray-200 rounded px-2 py-1.5 text-sm text-center w-16 focus:ring-2 focus:ring-brand focus:outline-none"
                    data-student="{{ item.student.id }}"
                    data-indicador="{{ ind }}"
-                   data-eda-id="{{ eda_id }}"
+                   data-mes="{{ mes }}"
+                   data-anio="{{ anio }}"
                    value="{% if b and b.calificacion is not none %}{{ b.calificacion }}{% endif %}"
-                   placeholder="--"
-                   {% if term_locked %}disabled{% endif %}>
+                   placeholder="--">
             <span class="beh-qual text-xs font-bold w-7 {% if b and b.qualitative_grade %}text-brand{% else %}text-gray-300{% endif %}">
               {{ b.qualitative_grade if b and b.qualitative_grade else '--' }}
             </span>
@@ -117,14 +99,14 @@
     </tbody>
   </table>
 </div>
-<p class="text-xs text-gray-400 mt-2">Los cambios se guardan automáticamente. El promedio considera todas las EDAs del año.</p>
-{% elif grado and seccion and eda_id %}
+<p class="text-xs text-gray-400 mt-2">Los cambios se guardan automáticamente. El promedio considera todos los meses del año.</p>
+{% elif grado and seccion and mes %}
 <div class="bg-white rounded-xl shadow p-8 text-center text-gray-400">
   No se encontraron estudiantes activos para el aula seleccionada.
 </div>
 {% else %}
 <div class="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-  Seleccione nivel, grado, sección, bimestre y EDA para registrar conducta.
+  Seleccione nivel, grado, sección y mes para registrar conducta.
 </div>
 {% endif %}
 {% endblock %}
@@ -195,7 +177,8 @@ document.querySelectorAll('.beh-input').forEach(inp => {
         body: JSON.stringify({
           student_id:   studentId,
           indicador:    this.dataset.indicador,
-          eda_id:       this.dataset.edaId,
+          mes:          this.dataset.mes,
+          anio:         this.dataset.anio,
           calificacion: val,
         }),
       });

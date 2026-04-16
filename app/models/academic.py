@@ -19,7 +19,7 @@ AREAS = [
 ]
 
 INDICADORES_CONDUCTA = [
-    "Responsabilidad", "Respeto", "Solidaridad", "Puntualidad", "Orden"
+    "Puntualidad", "Uniforme", "Cabello", "Higiene", "Disc-Respeto", "Agenda"
 ]
 
 INDICADORES_CONDUCTA_SECUNDARIA = [
@@ -256,6 +256,37 @@ class Behavior(db.Model):
 
     def __repr__(self):
         return f"<Behavior st={self.student_id} {self.indicador} eda={self.eda_id}: {self.calificacion}>"
+
+
+class BehaviorMonthly(db.Model):
+    """Calificación mensual de conducta (estudiante × indicador × mes × año)."""
+    __tablename__ = "behavior_monthly"
+    __table_args__ = (
+        db.UniqueConstraint("student_id", "indicador", "mes", "anio", name="uq_behavior_monthly"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    indicador = db.Column(db.String(80), nullable=False)
+    mes = db.Column(db.String(20), nullable=False)
+    anio = db.Column(db.Integer, nullable=False)
+    calificacion = db.Column(db.Integer, nullable=True)
+
+    @property
+    def qualitative_grade(self):
+        v = self.calificacion
+        if v is None:
+            return None
+        if v >= 18:
+            return "AD"
+        if v >= 15:
+            return "A"
+        if v >= 11:
+            return "B"
+        return "C"
+
+    def __repr__(self):
+        return f"<BehaviorMonthly st={self.student_id} {self.indicador} {self.mes}/{self.anio}: {self.calificacion}>"
 
 
 class ParentResponsibility(db.Model):

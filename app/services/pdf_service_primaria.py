@@ -238,8 +238,7 @@ class BoletaPrimariaPDF(FPDF):
             self.rect(ML, y0, logo_sz, logo_sz)
 
         tx = ML + logo_sz + 1.5
-        contact_w = 52
-        tw = ML + PW - tx - contact_w
+        tw = ML + PW - tx
         self.set_xy(tx, y0 + 0.2)
         self.set_font('Helvetica', 'B', 10)
         self._tc(BRAND)
@@ -256,18 +255,6 @@ class BoletaPrimariaPDF(FPDF):
         self._tc(GRAY)
         self.cell(tw, 2.6, self._safe('"Nuestra Mision, ... Tu Exito...!"'),
                   align='C', new_x='LMARGIN', new_y='NEXT')
-        self._reset()
-
-        cx = ML + PW - contact_w
-        cy_contact = y0 + 0.3
-        self.set_font('Helvetica', '', 5)
-        self._tc(GRAY)
-        self.set_xy(cx, cy_contact)
-        self.cell(contact_w, 2.4, self._safe('Av. San Carlos 406, Huancayo'),
-                  align='R', new_x='LMARGIN', new_y='NEXT')
-        self.set_xy(cx, cy_contact + 2.4)
-        self.cell(contact_w, 2.4, self._safe('Telf: 064-233700  Cel: 972648005'),
-                  align='R', new_x='LMARGIN', new_y='NEXT')
         self._reset()
 
         self.set_y(y0 + logo_sz + 0.6)
@@ -527,50 +514,57 @@ class BoletaPrimariaPDF(FPDF):
         terms = ctx['terms']
         nt = max(len(terms), 1)
         bim_labels = ['I BIM', 'II BIM', 'III BIM', 'IV BIM']
+        meses = ctx.get('meses', [])
+        mes_labels = [m[:3].upper() for m in meses]
 
         y0 = self.get_y()
         self.set_font('Helvetica', 'B', 5.5)
         self._fc(BRAND); self._tc(WHITE)
         self.set_xy(xL, y0)
         self.multi_cell(
-            w_half, 2.35,
-            self._safe('EVALUACION DEL COMPORTAMIENTO\nDEL ALUMNO(A)'),
+            PW, 2.35,
+            self._safe('EVALUACION DEL COMPORTAMIENTO DEL ALUMNO(A) DENTRO DE LA I.E.'),
             border=1, align='C', fill=True)
         self._reset()
-        hL = self.get_y() - y0
-        self.set_xy(xR, y0)
+        y1 = self.get_y()
+
+        y_end_L = self._behavior_panel(ctx, xL, PW, y1, rh, meses, mes_labels)
+        self.set_y(y_end_L)
+        self.ln(0.4)
+
+        # PPFF panel on full width below
+        y2 = self.get_y()
         self.set_font('Helvetica', 'B', 5.5)
         self._fc(BRAND); self._tc(WHITE)
+        self.set_xy(xL, y2)
         self.multi_cell(
             w_half, 2.35,
             self._safe('EVALUACION DE RESPONSABILIDAD\nDEL PPFF O APODERADO'),
             border=1, align='C', fill=True)
         self._reset()
-        hR = self.get_y() - y0
-        y1 = y0 + max(hL, hR)
-
-        y_end_L = self._behavior_panel(ctx, xL, w_half, y1, rh, terms, nt, bim_labels)
-        y_end_R = self._ppff_panel(ctx, xR, w_half, y1, rh, terms, nt, bim_labels)
-        self.set_y(max(y_end_L, y_end_R))
+        y3 = self.get_y()
+        y_end_R = self._ppff_panel(ctx, xL, w_half, y3, rh, terms, nt, bim_labels)
+        self.set_y(y_end_R)
         self.ln(0.4)
 
-    def _behavior_panel(self, ctx, x0, w, y0, rh, terms, nt, bim_labels):
+    def _behavior_panel(self, ctx, x0, w, y0, rh, meses, mes_labels):
         indicadores  = ctx['indicadores']
-        behavior_bt  = ctx.get('behavior_by_term', {})
-        beh_prom     = ctx.get('behavior_promedio', {})
-        beh_ind_avgs = ctx.get('behavior_ind_avgs', {})
+        behavior_bm  = ctx.get('behavior_by_month', {})
+        beh_prom     = ctx.get('behavior_monthly_avg', {})
+        beh_ind_avgs = ctx.get('behavior_monthly_ind_avgs', {})
+        nm = len(meses) if meses else 10
         q_w, prom_w = 6.0, 7.0
-        ind_w = min(30, max(20, int(w * 0.36)))
-        bim_w = (w - ind_w - prom_w - q_w) / nt
-        if bim_w < 7.5:
-            ind_w = max(18, w - prom_w - q_w - 7.5 * nt)
-            bim_w = (w - ind_w - prom_w - q_w) / nt
-        fs, fsh = 5.5, 6.0
+        ind_w = min(22, max(16, int(w * 0.16)))
+        mes_w = (w - ind_w - prom_w - q_w) / nm
+        if mes_w < 5.0:
+            ind_w = max(14, w - prom_w - q_w - 5.0 * nm)
+            mes_w = (w - ind_w - prom_w - q_w) / nm
+        fs, fsh = 4.5, 5.0
         y = y0
         self.set_xy(x0, y)
         self._hcell(ind_w, rh, '', size=fsh)
-        for i in range(len(terms)):
-            self._hcell(bim_w, rh, bim_labels[i] if i < 4 else '', size=fsh)
+        for label in mes_labels:
+            self._hcell(mes_w, rh, label, size=fsh)
         self._hcell(prom_w, rh, 'PROM.', size=fsh)
         self._hcell(q_w, rh, '', size=fsh, nx='RIGHT', ny='NEXT')
         y = self.get_y()
@@ -582,11 +576,11 @@ class BoletaPrimariaPDF(FPDF):
             self.cell(ind_w, rh, self._safe(' ' + ind), border=1, align='L',
                       fill=True, new_x='RIGHT', new_y='LAST')
             self._reset()
-            for term in terms:
-                term_beh = behavior_bt.get(term.id, {})
-                b = term_beh.get(ind)
+            for mes in meses:
+                month_beh = behavior_bm.get(mes, {})
+                b = month_beh.get(ind)
                 cal = b.calificacion if b and b.calificacion is not None else None
-                self._dcell(bim_w, rh, str(cal) if cal is not None else '-',
+                self._dcell(mes_w, rh, str(cal) if cal is not None else '-',
                             bold=cal is not None, size=fs)
             ind_avg = beh_ind_avgs.get(ind, {})
             pn = ind_avg.get('promedio_num')
@@ -600,11 +594,11 @@ class BoletaPrimariaPDF(FPDF):
         self.set_xy(x0, y)
         self.set_font('Helvetica', 'B', fs)
         self._fc(AREA_BG); self._tc(BLACK)
-        self.cell(ind_w, rh, self._safe('PROMEDIO GENERAL'), border=1,
+        self.cell(ind_w, rh, self._safe('PROM. GRAL'), border=1,
                   align='R', fill=True, new_x='RIGHT', new_y='LAST')
         self._reset()
-        for _ in terms:
-            self._dcell(bim_w, rh, '-', size=fs)
+        for _ in meses:
+            self._dcell(mes_w, rh, '-', size=fs)
         pn = beh_prom.get('promedio_num')
         pq = beh_prom.get('promedio_cual', '--')
         self._dcell(prom_w, rh, str(pn) if pn is not None else '-',
@@ -736,21 +730,6 @@ class BoletaPrimariaPDF(FPDF):
         self.set_x(ML); self.set_y(self.get_y() + 4)
 
     # ──────────────────────────────────────────────────────────────────────────
-    def _footer_bar(self, anio, fecha):
-        self.ln(1)
-        self._dc(LIGHT_GRAY)
-        self.line(ML, self.get_y(), ML + PW, self.get_y())
-        self.ln(0.6)
-        self.set_font('Helvetica', '', 7)
-        self._tc(GRAY)
-        self.cell(PW / 2, 4,
-                  f'Complejo Educativo SAN CARLOS {anio}  |  Av. San Carlos 406 - Huancayo',
-                  align='L', new_x='RIGHT', new_y='LAST')
-        self.cell(PW / 2, 4,
-                  f'Telf: 064-233700  |  Cel. 972648005  |  {fecha}',
-                  align='R', new_x='LMARGIN', new_y='NEXT')
-        self._reset()
-
     # ==========================================================================
     # ENTRY POINTS
     # ==========================================================================
@@ -762,7 +741,6 @@ class BoletaPrimariaPDF(FPDF):
         self._behavior_ppff_row(ctx)
         self._comments(ctx)
         self._signatures(ctx)
-        self._footer_bar(ctx['anio'], ctx['fecha_emision'])
 
     def build(self, ctx: dict) -> bytes:
         self.add_page()

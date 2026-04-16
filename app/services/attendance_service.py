@@ -21,10 +21,13 @@ def get_student_attendance(student_id: int, anio: int) -> list[Attendance]:
     return Attendance.query.filter_by(student_id=student_id, anio=anio).all()
 
 
-def get_class_attendance_month(grado: str, seccion: str, mes: str, anio: int) -> list:
+def get_class_attendance_month(grado: str, seccion: str, mes: str, anio: int, nivel: str = "") -> list:
     """Lista de (Student, Attendance | None) para un aula y mes."""
     from app.models.student import Student
-    students = Student.query.filter_by(grado=grado, seccion=seccion, estado="ACTIVO").order_by(Student.apellido_paterno, Student.apellido_materno, Student.nombres).all()
+    filters = dict(grado=grado, seccion=seccion, estado="ACTIVO")
+    if nivel:
+        filters["nivel"] = nivel
+    students = Student.query.filter_by(**filters).order_by(Student.apellido_paterno, Student.apellido_materno, Student.nombres).all()
     result = []
     for s in students:
         att = Attendance.query.filter_by(student_id=s.id, mes=mes, anio=anio).first()

@@ -30,7 +30,7 @@ async def index(request: Request, current_user: User = Depends(require_role("ADM
 
     rows = []
     if grado and seccion and mes:
-        rows = get_class_attendance_month(grado, seccion, mes, anio)
+        rows = get_class_attendance_month(grado, seccion, mes, anio, nivel=nivel)
 
     return render(
         request, "attendance/index.html",

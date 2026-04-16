@@ -3,15 +3,15 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from app.database import db
 from app.auth.dependencies import require_role
-from app.schemas.json_payloads import BehaviorSavePayload
+from app.schemas.json_payloads import BehaviorMonthlySavePayload
 from app.security.permissions import assert_can_view_student
 from app.services.behavior_service import (
-    upsert_behavior, get_student_behavior_by_eda, get_behavior_average,
-    get_behavior_indicator_averages,
+    upsert_behavior_monthly, get_student_behavior_by_month,
+    get_behavior_monthly_average, get_behavior_monthly_indicator_averages,
 )
 from app.models.student import Student, SECCIONES
 from app.models.academic import (
-    Term, EDA, INDICADORES_CONDUCTA, INDICADORES_CONDUCTA_SECUNDARIA,
+    INDICADORES_CONDUCTA, INDICADORES_CONDUCTA_SECUNDARIA, MESES,
 )
 from app.models.user import User
 from app.utils.scope import sanitize_nivel_grado_convivencia, convivencia_allowed_niveles, convivencia_allowed_grados
@@ -31,34 +31,20 @@ async def index(request: Request, current_user: User = Depends(require_role("ADM
         current_user,
     )
     seccion = request.query_params.get("seccion", "")
-    term_id = request.query_params.get("term_id")
-    term_id = int(term_id) if term_id else None
-    eda_id = request.query_params.get("eda_id")
-    eda_id = int(eda_id) if eda_id else None
+    mes = request.query_params.get("mes", "")
 
     indicadores = (INDICADORES_CONDUCTA_SECUNDARIA
                    if nivel == "SECUNDARIA" else INDICADORES_CONDUCTA)
 
-    terms = Term.query.filter_by(anio=anio).order_by(Term.orden).all()
-    edas = []
-
-    if term_id:
-        edas = EDA.query.filter_by(term_id=term_id).order_by(EDA.orden).all()
-        if not eda_id and edas:
-            eda_id = edas[0].id
-
-    selected_term = Term.query.get(term_id) if term_id else None
-    term_locked = selected_term.locked if selected_term else False
-
     students_data = []
-    if grado and seccion and eda_id:
+    if grado and seccion and mes:
         students = Student.query.filter_by(
             nivel=nivel, grado=grado, seccion=seccion, estado="ACTIVO"
         ).order_by(Student.apellido_paterno, Student.apellido_materno, Student.nombres).all()
         for s in students:
-            beh = get_student_behavior_by_eda(s.id, eda_id)
-            beh_avg = get_behavior_average(s.id, anio, nivel)
-            ind_avgs = get_behavior_indicator_averages(s.id, anio, indicadores, nivel)
+            beh = get_student_behavior_by_month(s.id, mes, anio)
+            beh_avg = get_behavior_monthly_average(s.id, anio, nivel)
+            ind_avgs = get_behavior_monthly_indicator_averages(s.id, anio, indicadores, nivel)
             students_data.append({
                 "student": s, "behavior": beh,
                 "promedio": beh_avg, "ind_avgs": ind_avgs,
@@ -68,11 +54,9 @@ async def index(request: Request, current_user: User = Depends(require_role("ADM
         request, "behavior/index.html",
         niveles=convivencia_allowed_niveles(current_user), nivel=nivel,
         grados=convivencia_allowed_grados(nivel, current_user), secciones=SECCIONES,
-        indicadores=indicadores,
+        indicadores=indicadores, meses=MESES,
         grado=grado, seccion=seccion, anio=anio,
-        terms=terms, term_id=term_id,
-        edas=edas, eda_id=eda_id,
-        term_locked=term_locked,
+        mes=mes,
         students_data=students_data,
     )
 
@@ -80,7 +64,7 @@ async def index(request: Request, current_user: User = Depends(require_role("ADM
 @router.post("/save", name="behavior.save")
 async def save(request: Request, current_user: User = Depends(require_role("ADMIN", "AUXILIAR", "DOCENTE", niveles=("INICIAL", "PRIMARIA")))):
     try:
-        data = BehaviorSavePayload.model_validate(await request.json())
+        data = BehaviorMonthlySavePayload.model_validate(await request.json())
     except ValidationError:
         return JSONResponse({"ok": False, "error": "Datos inválidos."}, status_code=400)
 
@@ -93,17 +77,11 @@ async def save(request: Request, current_user: User = Depends(require_role("ADMI
         return JSONResponse({"ok": False, "error": e.detail}, status_code=e.status_code)
 
     try:
-        if not current_user.has_role("ADMIN"):
-            eda_obj = db.session.get(EDA, data.eda_id)
-            if eda_obj:
-                term_obj = db.session.get(Term, eda_obj.term_id)
-                if term_obj and term_obj.locked:
-                    return JSONResponse({"ok": False, "error": "El bimestre está bloqueado. Contacta al administrador."}, status_code=423)
-
-        record = upsert_behavior(
+        record = upsert_behavior_monthly(
             student_id=data.student_id,
             indicador=data.indicador,
-            eda_id=data.eda_id,
+            mes=data.mes,
+            anio=data.anio,
             calificacion=data.calificacion,
         )
         return JSONResponse({"ok": True, "calificacion": record.calificacion or "--"})

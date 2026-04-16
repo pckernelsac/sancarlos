@@ -17,6 +17,8 @@ from app.services.attendance_service import get_student_attendance
 from app.services.behavior_service import (
     get_student_behavior, get_student_behavior_all_terms,
     get_behavior_average, get_behavior_indicator_averages,
+    get_student_behavior_all_months, get_behavior_monthly_average,
+    get_behavior_monthly_indicator_averages,
 )
 from app.services.parent_service import (
     get_student_ppff_all_terms, get_ppff_average, get_ppff_indicator_averages,
@@ -76,6 +78,15 @@ def _build_boleta_context(student_id: int, anio: int, staff_map: dict | None = N
         student_id, anio, INDICADORES_CONDUCTA, student.nivel
     )
 
+    # Monthly behavior data for PDF
+    behavior_by_month = get_student_behavior_all_months(student_id, anio)
+    behavior_monthly_avg = get_behavior_monthly_average(student_id, anio, student.nivel)
+    indicadores_nivel = (INDICADORES_CONDUCTA_SECUNDARIA
+                         if student.nivel == "SECUNDARIA" else INDICADORES_CONDUCTA)
+    behavior_monthly_ind_avgs = get_behavior_monthly_indicator_averages(
+        student_id, anio, indicadores_nivel, student.nivel
+    )
+
     ppff_by_term = get_student_ppff_all_terms(student_id, anio)
     ppff_avg = get_ppff_average(student_id, anio, student.nivel)
     ppff_ind_avgs = get_ppff_indicator_averages(student_id, anio, student.nivel)
@@ -89,7 +100,10 @@ def _build_boleta_context(student_id: int, anio: int, staff_map: dict | None = N
         "total_faltas": total_faltas, "total_tardanzas": total_tardanzas,
         "behavior": behavior, "behavior_by_term": behavior_by_term,
         "behavior_promedio": behavior_avg, "behavior_ind_avgs": behavior_ind_avgs,
-        "indicadores": INDICADORES_CONDUCTA, "indicadores_ppff": INDICADORES_PPFF,
+        "behavior_by_month": behavior_by_month,
+        "behavior_monthly_avg": behavior_monthly_avg,
+        "behavior_monthly_ind_avgs": behavior_monthly_ind_avgs,
+        "indicadores": indicadores_nivel, "indicadores_ppff": INDICADORES_PPFF,
         "ppff_by_term": ppff_by_term, "ppff_promedio": ppff_avg,
         "ppff_ind_avgs": ppff_ind_avgs, "meses": MESES,
         "comments_per_term": comments_per_term, "promedio_anual": promedio_anual,

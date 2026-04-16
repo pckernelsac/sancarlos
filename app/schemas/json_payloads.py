@@ -132,6 +132,19 @@ class BehaviorSavePayload(BaseModel):
         return _clamp_numeric_str(v, 32)
 
 
+class BehaviorMonthlySavePayload(BaseModel):
+    student_id: int = Field(..., ge=1)
+    indicador: str = Field(..., min_length=1, max_length=128)
+    mes: str = Field(..., min_length=1, max_length=32)
+    anio: int = Field(..., ge=2000, le=2100)
+    calificacion: Any = ""
+
+    @field_validator("calificacion", mode="before")
+    @classmethod
+    def clamp_cal(cls, v):
+        return _clamp_numeric_str(v, 32)
+
+
 _MES_RE = re.compile(
     r"^(Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre)$",
     re.IGNORECASE,
