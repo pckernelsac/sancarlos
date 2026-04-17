@@ -207,42 +207,39 @@ body {
     </tr>
   </thead>
   <tbody>
-    {% set ns = namespace(current_area='') %}
-    {% for course_id, data in matrix.items() %}
-      {% set course = data.course %}
-      {% if course.area != ns.current_area %}
-        {% set ns.current_area = course.area %}
-        <tr>
-          <td class="td-area bold" colspan="{{ 2 + terms|length * 4 + 1 }}">
-            {{ course.area | upper }}
-          </td>
-        </tr>
-      {% endif %}
+    {% for area_display, items in ordered_courses %}
       <tr>
-        <td class="td-area" style="background:#eef4fb"></td>
-        <td class="td-course">{{ course.nombre }}</td>
-        {% for term in terms %}
-          {% set p1 = eda_data.get(term.id, {}).get(1, {}).get(course_id) %}
-          <td>{{ p1 if p1 is not none else '-' }}</td>
-          {% set p2 = eda_data.get(term.id, {}).get(2, {}).get(course_id) %}
-          <td>{{ p2 if p2 is not none else '-' }}</td>
-          {% set g = data.terms.get(term.id) %}
-          {% if g and g.numeric_value is not none %}
-            <td class="td-prom">{{ g.numeric_value }}</td>
-            <td class="q-{{ g.qualitative_grade }}">{{ g.qualitative_grade }}</td>
+        <td class="td-area bold" colspan="{{ 2 + terms|length * 4 + 1 }}">
+          {{ area_display }}
+        </td>
+      </tr>
+      {% for course_id, data in items %}
+        {% set course = data.course %}
+        <tr>
+          <td class="td-area" style="background:#eef4fb"></td>
+          <td class="td-course">{{ course.nombre }}</td>
+          {% for term in terms %}
+            {% set p1 = eda_data.get(term.id, {}).get(1, {}).get(course_id) %}
+            <td>{{ p1 if p1 is not none else '-' }}</td>
+            {% set p2 = eda_data.get(term.id, {}).get(2, {}).get(course_id) %}
+            <td>{{ p2 if p2 is not none else '-' }}</td>
+            {% set g = data.terms.get(term.id) %}
+            {% if g and g.numeric_value is not none %}
+              <td class="td-prom">{{ g.numeric_value }}</td>
+              <td class="q-{{ g.qualitative_grade }}">{{ g.qualitative_grade }}</td>
+            {% else %}
+              <td class="td-prom q-NA">-</td>
+              <td class="q-NA">-</td>
+            {% endif %}
+          {% endfor %}
+          {% if data.promedio_cual and data.promedio_cual != '--' %}
+            <td class="q-{{ data.promedio_cual }}">{{ data.promedio_cual }}</td>
           {% else %}
-            <td class="td-prom q-NA">-</td>
             <td class="q-NA">-</td>
           {% endif %}
-        {% endfor %}
-        {% if data.promedio_cual and data.promedio_cual != '--' %}
-          <td class="q-{{ data.promedio_cual }}">{{ data.promedio_cual }}</td>
-        {% else %}
-          <td class="q-NA">-</td>
-        {% endif %}
-      </tr>
+        </tr>
+      {% endfor %}
     {% endfor %}
-
   </tbody>
 </table>
 </div>

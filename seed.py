@@ -151,6 +151,7 @@ cursos_secundaria = [
     ("LENGUAJE",           "Comunicación"),
     ("LITERATURA",         "Comunicación"),
     ("RAZ. VERBAL",        "Comunicación"),
+    ("COMP. LECTORA",      "Comunicación"),
     ("EDUCACIÓN CIVICA",   "DPCC"),
     ("FILOSOFÍA",          "DPCC"),
     ("PSICOLOGÍA",         "DPCC"),
@@ -158,6 +159,7 @@ cursos_secundaria = [
     ("HISTORIA UNIVERSAL", "Ciencias Sociales"),
     ("GEOGRAFÍA",          "Ciencias Sociales"),
     ("ECONOMÍA",           "Ciencias Sociales"),
+    ("METODOLOGÍA",        "Ciencias Sociales"),
     ("FÍSICA",             "Ciencia y Tecnología"),
     ("QUÍMICA",            "Ciencia y Tecnología"),
     ("BIOLOGÍA",           "Ciencia y Tecnología"),
@@ -174,7 +176,7 @@ for nombre, area in cursos_secundaria:
             existing.area = area
     else:
         db.session.add(Course(nombre=nombre, area=area, nivel="SECUNDARIA", grado=None))
-print("[OK] Cursos SECUNDARIA creados/verificados (24 cursos)")
+print("[OK] Cursos SECUNDARIA creados/verificados (26 cursos)")
 
 db.session.commit()
 print("\n[DONE] Seed completado exitosamente.")

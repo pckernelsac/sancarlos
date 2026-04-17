@@ -263,7 +263,58 @@ def _build_boleta_context_secundaria(student_id: int, anio: int, staff_map: dict
         student_id, anio, INDICADORES_CONDUCTA_SECUNDARIA, ctx["student"].nivel
     )
     ctx["area_avgs"] = _compute_area_avgs(ctx)
+    ctx["ordered_courses"] = _order_courses_by_grade(ctx)
     return ctx
+
+
+def _order_courses_by_grade(ctx: dict) -> list:
+    """Ordena los cursos del matrix según la configuración de grado para la vista HTML.
+    Retorna: [(area_display, [(course_id, data), ...]), ...]
+    """
+    from app.services.pdf_service_secundaria import CURSOS_POR_GRADO, AREA_DISPLAY
+    import unicodedata
+
+    def _normalize(name: str) -> str:
+        nfkd = unicodedata.normalize('NFKD', name.upper())
+        return ''.join(c for c in nfkd if not unicodedata.combining(c)).strip()
+
+    matrix = ctx["matrix"]
+    student = ctx["student"]
+    grado = str(student.grado)
+    cursos_cfg = CURSOS_POR_GRADO.get(grado)
+
+    if not cursos_cfg:
+        # Fallback: agrupar por área de BD
+        from collections import OrderedDict
+        area_groups: OrderedDict[str, list] = OrderedDict()
+        for course_id, data in matrix.items():
+            area = data["course"].area
+            display = AREA_DISPLAY.get(area, area.upper())
+            area_groups.setdefault(display, []).append((course_id, data))
+        return list(area_groups.items())
+
+    # Índice por nombre normalizado
+    course_by_name = {}
+    for course_id, data in matrix.items():
+        key = _normalize(data["course"].nombre)
+        course_by_name[key] = (course_id, data)
+
+    result = []
+    used_ids = set()
+    for area_display, curso_names in cursos_cfg.items():
+        items = []
+        for cn in curso_names:
+            key = _normalize(cn)
+            match = course_by_name.get(key)
+            if match:
+                items.append(match)
+                used_ids.add(match[0])
+        if items:
+            result.append((area_display, items))
+
+    # Cursos no configurados para este grado se omiten de la boleta
+
+    return result
 
 
 def _compute_area_avgs(ctx: dict) -> dict:

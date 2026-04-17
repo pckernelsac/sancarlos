@@ -48,13 +48,59 @@ BW   = P1W + P2W + PMW   # = 27 por bimestre
 PFW  = 12       # Promedio Final
 NLW  = PW - AW - CW - 4 * BW - PFW   # nivel de logro (~19 mm)
 
-# Orden preferido de áreas en la boleta
+# ── Cursos por grado (define orden y agrupación por área en la boleta) ────────
+# Cada entrada: (área_display, [lista de nombres de curso])
+# El nombre de curso debe coincidir con Course.nombre en la BD.
+
+_CURSOS_1_2 = OrderedDict([
+    ("COMUNICACIÓN",        ["LENGUAJE", "LITERATURA", "RAZ. VERBAL", "COMP. LECTORA"]),
+    ("MATEMÁTICAS",         ["ARITMÉTICA", "ÁLGEBRA", "GEOMETRÍA", "RAZ. MATEMÁTICO"]),
+    ("CIENCIAS\nSOCIALES",  ["HISTORIA UNIVERSAL", "HISTORIA DEL PERÚ", "GEOGRAFÍA", "METODOLOGÍA"]),
+    ("CIENCIA Y\nTECNOLOGÍA", ["FÍSICA", "QUÍMICA", "BIOLOGÍA"]),
+    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
+    ("IDIOMA EXTRANJERO",   ["INGLÉS"]),
+    ("DPCC",                ["EDUCACIÓN CIVICA"]),
+    ("ROBÓTICA",            ["ROBÓTICA"]),
+    ("ITALIANO",            ["ITALIANO"]),
+])
+
+_CURSOS_3 = OrderedDict([
+    ("COMUNICACIÓN",        ["LENGUAJE", "LITERATURA", "RAZ. VERBAL", "COMP. LECTORA"]),
+    ("MATEMÁTICAS",         ["ARITMÉTICA", "ÁLGEBRA", "GEOMETRÍA", "TRIGONOMETRÍA", "RAZ. MATEMÁTICO"]),
+    ("CIENCIAS\nSOCIALES",  ["HISTORIA UNIVERSAL", "HISTORIA DEL PERÚ", "GEOGRAFÍA", "METODOLOGÍA"]),
+    ("CIENCIA Y\nTECNOLOGÍA", ["FÍSICA", "QUÍMICA", "BIOLOGÍA"]),
+    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
+    ("IDIOMA EXTRANJERO",   ["INGLÉS"]),
+    ("ROBÓTICA",            ["ROBÓTICA"]),
+    ("ITALIANO",            ["ITALIANO"]),
+])
+
+_CURSOS_4_5 = OrderedDict([
+    ("COMUNICACIÓN",        ["LENGUAJE", "LITERATURA", "RAZ. VERBAL", "COMP. LECTORA"]),
+    ("MATEMÁTICAS",         ["ARITMÉTICA", "ÁLGEBRA", "GEOMETRÍA", "TRIGONOMETRÍA", "RAZ. MATEMÁTICO", "ESTADÍSTICA"]),
+    ("CIENCIAS\nSOCIALES",  ["HISTORIA DEL PERÚ", "GEOGRAFÍA", "ECONOMÍA"]),
+    ("CIENCIA Y\nTECNOLOGÍA", ["FÍSICA", "QUÍMICA", "BIOLOGÍA", "ECOLOGÍA"]),
+    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
+    ("IDIOMA EXTRANJERO",   ["INGLÉS"]),
+    ("DPCC",                ["EDUCACIÓN CIVICA", "FILOSOFÍA", "PSICOLOGÍA"]),
+    ("ROBÓTICA",            ["ROBÓTICA"]),
+    ("ITALIANO",            ["ITALIANO"]),
+])
+
+CURSOS_POR_GRADO = {
+    "1": _CURSOS_1_2,
+    "2": _CURSOS_1_2,
+    "3": _CURSOS_3,
+    "4": _CURSOS_4_5,
+    "5": _CURSOS_4_5,
+}
+
+# Fallback: orden y display genéricos (si el grado no está configurado)
 AREA_ORDER = [
     "Matemática", "Comunicación", "DPCC", "Ciencias Sociales",
     "Ciencia y Tecnología", "Educación Física", "Idioma Inglés",
 ]
 
-# Nombres de área mostrados en la boleta
 AREA_DISPLAY = {
     "Matemática":           "MATEMÁTICAS",
     "Comunicación":         "COMUNICACIÓN",
@@ -132,13 +178,21 @@ class BoletaSecundariaPDF(FPDF):
         self._reset()
 
     # ── Celda de área fusionada ──────────────────────────────────────────────
+    def _draw_area_cell_direct(self, display: str, y: float, h: float):
+        """Dibuja la celda de área fusionada usando el nombre display directamente."""
+        self._draw_area_cell_impl(display, y, h)
+
     def _draw_area_cell(self, area_name: str, y: float, h: float):
         """Dibuja la celda de área fusionada verticalmente con texto centrado."""
+        display = AREA_DISPLAY.get(area_name, area_name.upper())
+        self._draw_area_cell_impl(display, y, h)
+
+    def _draw_area_cell_impl(self, display: str, y: float, h: float):
+        """Implementación de la celda de área fusionada."""
         self._dc(BLACK)
         self._fc(AREA_BG)
         self.rect(ML, y, AW, h, style='DF')
 
-        display = AREA_DISPLAY.get(area_name, area_name.upper())
         lines = display.split('\n')
 
         # Si es una sola línea larga, hacer word-wrap manual
@@ -252,21 +306,60 @@ class BoletaSecundariaPDF(FPDF):
         matrix    = ctx['matrix']
         terms     = ctx['terms']
         eda_data  = ctx['eda_data']
+        student   = ctx['student']
         bim_names = ['I BIMESTRE', 'II BIMESTRE', 'III BIMESTRE', 'IV BIMESTRE']
 
-        # ── Agrupar cursos por área (preservando orden) ──────────────────
-        area_groups = OrderedDict()
-        for course_id, data in matrix.items():
-            area = data['course'].area
-            area_groups.setdefault(area, []).append((course_id, data))
+        # ── Índice de cursos por nombre (upper, sin tildes) ──────────────
+        def _normalize(name: str) -> str:
+            import unicodedata
+            nfkd = unicodedata.normalize('NFKD', name.upper())
+            return ''.join(c for c in nfkd if not unicodedata.combining(c)).strip()
 
-        # Reordenar según AREA_ORDER
-        sorted_groups = OrderedDict()
-        for a in AREA_ORDER:
-            if a in area_groups:
-                sorted_groups[a] = area_groups.pop(a)
-        for a, v in area_groups.items():  # áreas no listadas, al final
-            sorted_groups[a] = v
+        course_by_name: dict[str, tuple[int, dict]] = {}
+        for course_id, data in matrix.items():
+            key = _normalize(data['course'].nombre)
+            course_by_name[key] = (course_id, data)
+
+        # ── Obtener configuración de cursos por grado ────────────────────
+        grado = str(student.grado)
+        cursos_cfg = CURSOS_POR_GRADO.get(grado)
+
+        if cursos_cfg:
+            # Construir grupos ordenados según la configuración del grado
+            sorted_groups: OrderedDict[str, list] = OrderedDict()
+            used_ids: set[int] = set()
+
+            for area_display, curso_names in cursos_cfg.items():
+                items = []
+                for cn in curso_names:
+                    key = _normalize(cn)
+                    match = course_by_name.get(key)
+                    if match:
+                        items.append(match)
+                        used_ids.add(match[0])
+                if items:
+                    sorted_groups[area_display] = items
+
+            # Cursos no configurados para este grado se omiten de la boleta
+        else:
+            # Fallback: agrupar por área de BD
+            area_groups: OrderedDict[str, list] = OrderedDict()
+            for course_id, data in matrix.items():
+                area = data['course'].area
+                area_groups.setdefault(area, []).append((course_id, data))
+
+            sorted_groups = OrderedDict()
+            for a in AREA_ORDER:
+                if a in area_groups:
+                    display = AREA_DISPLAY.get(a, a.upper())
+                    sorted_groups[display] = area_groups.pop(a)
+            for a, v in area_groups.items():
+                display = AREA_DISPLAY.get(a, a.upper())
+                sorted_groups[display] = v
+
+        # ── Calcular alto de fila dinámico según cantidad de cursos ──────
+        total_courses = sum(len(items) for items in sorted_groups.values())
+        rh = 4.0 if total_courses > 20 else (4.3 if total_courses > 18 else RH)
 
         # ── Fila header superior ─────────────────────────────────────────
         hdr_h = HR1 + HR2
@@ -291,18 +384,17 @@ class BoletaSecundariaPDF(FPDF):
         self.set_y(self.get_y() + HR2)
 
         # ── Filas de cursos por área ─────────────────────────────────────
-        for area, items in sorted_groups.items():
+        for area_display, items in sorted_groups.items():
             n = len(items)
             y_area = self.get_y()
-            area_height = n * RH
+            area_height = n * rh
 
-            # Detectar áreas de un solo curso (Educación Física, Idioma Inglés)
+            # Detectar áreas de un solo curso (Educación Física, Idioma Inglés, etc.)
             single = (n == 1)
 
             if single:
                 # Área y curso en una sola fila combinada
-                display = AREA_DISPLAY.get(area, area.upper())
-                self._hcell(AW + CW, RH, display, bg=AREA_BG, fg=BLACK,
+                self._hcell(AW + CW, rh, area_display, bg=AREA_BG, fg=BLACK,
                             size=9, align='L')
             else:
                 # Celda de área fusionada verticalmente (se dibuja después)
@@ -311,12 +403,12 @@ class BoletaSecundariaPDF(FPDF):
             # Dibujar cada fila de curso
             for i, (cid, cdata) in enumerate(items):
                 course = cdata['course']
-                row_y = y_area + i * RH
+                row_y = y_area + i * rh
 
                 if not single:
                     self.set_xy(ML + AW, row_y)
                     # Celda de curso
-                    self._dcell(CW, RH, course.nombre, align='L', size=9)
+                    self._dcell(CW, rh, course.nombre, align='L', size=9)
                 # else: ya se dibujó la celda combinada, posición correcta
 
                 # Notas por bimestre
@@ -325,28 +417,28 @@ class BoletaSecundariaPDF(FPDF):
                     v2 = eda_data.get(term.id, {}).get(2, {}).get(cid)
                     g  = cdata['terms'].get(term.id)
 
-                    self._dcell(P1W, RH, v1 if v1 is not None else '-', size=8.5)
-                    self._dcell(P2W, RH, v2 if v2 is not None else '-', size=8.5)
+                    self._dcell(P1W, rh, v1 if v1 is not None else '-', size=8.5)
+                    self._dcell(P2W, rh, v2 if v2 is not None else '-', size=8.5)
                     if g and g.numeric_value is not None:
-                        self._dcell(PMW, RH, g.numeric_value, bg=PROM_BG,
+                        self._dcell(PMW, rh, g.numeric_value, bg=PROM_BG,
                                     bold=True, size=9)
                     else:
-                        self._dcell(PMW, RH, '-', bg=PROM_BG, size=8.5)
+                        self._dcell(PMW, rh, '-', bg=PROM_BG, size=8.5)
 
                 # PF del curso
                 pf_num = cdata.get('promedio_num')
                 pq     = cdata.get('promedio_cual', '--')
                 if pf_num is not None:
-                    self._dcell(PFW, RH, pf_num, bg=PROM_BG, bold=True, size=8)
+                    self._dcell(PFW, rh, pf_num, bg=PROM_BG, bold=True, size=8)
                 else:
-                    self._dcell(PFW, RH, '-', bg=PROM_BG, size=7.5)
+                    self._dcell(PFW, rh, '-', bg=PROM_BG, size=7.5)
 
-                self._badge(NLW, RH, pq if pq != '--' else None,
+                self._badge(NLW, rh, pq if pq != '--' else None,
                             size=7.5, nx='LMARGIN', ny='LAST')
 
             # Dibujar la celda de área fusionada (encima de los cursos)
             if not single:
-                self._draw_area_cell(area, y_area, area_height)
+                self._draw_area_cell_direct(area_display, y_area, area_height)
 
             # Mover Y al final del grupo
             self.set_y(y_area + area_height)
