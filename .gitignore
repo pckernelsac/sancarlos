@@ -17,3 +17,6 @@ startup_log.txt
 tmp/
 *.zip
 node_modules/
+boleta_*_test*.pdf
+boleta_secundaria_test.pdf
+scripts/gen_test_pdfs.py

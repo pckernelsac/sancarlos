@@ -11,6 +11,7 @@ from collections import OrderedDict
 from fpdf import FPDF
 
 from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
+from app.services.grade_service import _round_half_up, numeric_to_qualitative
 
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 BRAND       = (14,  47, 119)
@@ -26,8 +27,8 @@ LIGHT_GRAY  = (210, 210, 210)
 
 BADGE = {
     'AD': {'bg': (219, 234, 254), 'fg': (30,  64, 175)},
-    'A':  {'bg': (220, 252, 231), 'fg': (22, 101,  52)},
-    'B':  {'bg': (254, 249, 195), 'fg': (113, 63,  18)},
+    'A':  {'bg': (219, 234, 254), 'fg': (30,  64, 175)},
+    'B':  {'bg': (220, 252, 231), 'fg': (22, 101,  52)},
     'C':  {'bg': (254, 226, 226), 'fg': (153, 27,  27)},
 }
 
@@ -57,9 +58,9 @@ _CURSOS_1_2 = OrderedDict([
     ("MATEMÁTICAS",         ["ARITMÉTICA", "ÁLGEBRA", "GEOMETRÍA", "RAZ. MATEMÁTICO"]),
     ("CIENCIAS\nSOCIALES",  ["HISTORIA UNIVERSAL", "HISTORIA DEL PERÚ", "GEOGRAFÍA", "METODOLOGÍA"]),
     ("CIENCIA Y\nTECNOLOGÍA", ["FÍSICA", "QUÍMICA", "BIOLOGÍA"]),
-    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
     ("IDIOMA EXTRANJERO",   ["INGLÉS"]),
     ("DPCC",                ["EDUCACIÓN CIVICA"]),
+    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
     ("ROBÓTICA",            ["ROBÓTICA"]),
     ("ITALIANO",            ["ITALIANO"]),
 ])
@@ -80,9 +81,9 @@ _CURSOS_4_5 = OrderedDict([
     ("MATEMÁTICAS",         ["ARITMÉTICA", "ÁLGEBRA", "GEOMETRÍA", "TRIGONOMETRÍA", "RAZ. MATEMÁTICO", "ESTADÍSTICA"]),
     ("CIENCIAS\nSOCIALES",  ["HISTORIA DEL PERÚ", "GEOGRAFÍA", "ECONOMÍA"]),
     ("CIENCIA Y\nTECNOLOGÍA", ["FÍSICA", "QUÍMICA", "BIOLOGÍA", "ECOLOGÍA"]),
-    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
     ("IDIOMA EXTRANJERO",   ["INGLÉS"]),
     ("DPCC",                ["EDUCACIÓN CIVICA", "FILOSOFÍA", "PSICOLOGÍA"]),
+    ("EDUCACIÓN FÍSICA",    ["EDUCACIÓN FÍSICA"]),
     ("ROBÓTICA",            ["ROBÓTICA"]),
     ("ITALIANO",            ["ITALIANO"]),
 ])
@@ -170,6 +171,33 @@ class BoletaSecundariaPDF(FPDF):
                       fill=True, new_x=nx, new_y=ny)
         self._reset()
 
+    def _draw_area_final(self, x, y, h, avg, qual):
+        """Celda PROMEDIO FINAL fusionada: sub-columna numérica + sub-columna letra."""
+        self._fc(PROM_BG); self._dc(BLACK)
+        self.rect(x, y, PFW, h, style='DF')
+        self.set_font('Helvetica', 'B', 10)
+        self._tc(BLACK)
+        txt = str(avg) if avg is not None else '-'
+        self.set_xy(x, y + (h - 4.2) / 2)
+        self.cell(PFW, 4.2, self._safe(txt), align='C')
+
+        if qual and qual in BADGE:
+            b = BADGE[qual]
+            self._fc(b['bg']); self._dc(BLACK)
+            self.rect(x + PFW, y, NLW, h, style='DF')
+            self.set_font('Helvetica', 'B', 11)
+            self._tc(b['fg'])
+            self.set_xy(x + PFW, y + (h - 4.2) / 2)
+            self.cell(NLW, 4.2, qual, align='C')
+        else:
+            self._fc(WHITE); self._dc(BLACK)
+            self.rect(x + PFW, y, NLW, h, style='DF')
+            self.set_font('Helvetica', '', 9)
+            self._tc(GRAY)
+            self.set_xy(x + PFW, y + (h - 4.2) / 2)
+            self.cell(NLW, 4.2, '-', align='C')
+        self._reset()
+
     def _section_bar(self, title):
         self.set_font('Helvetica', 'B', 7.5)
         self._fc(BRAND); self._tc(WHITE)
@@ -188,40 +216,51 @@ class BoletaSecundariaPDF(FPDF):
         self._draw_area_cell_impl(display, y, h)
 
     def _draw_area_cell_impl(self, display: str, y: float, h: float):
-        """Implementación de la celda de área fusionada."""
+        """Implementación de la celda de área fusionada con auto-wrap/shrink."""
         self._dc(BLACK)
         self._fc(AREA_BG)
         self.rect(ML, y, AW, h, style='DF')
 
-        lines = display.split('\n')
+        def _wrap(txt, max_w, fs):
+            self.set_font('Helvetica', 'B', fs)
+            out = []
+            for raw_ln in txt.split('\n'):
+                if self.get_string_width(raw_ln) <= max_w:
+                    out.append(raw_ln); continue
+                words = raw_ln.split()
+                cur = ''
+                for word in words:
+                    test = f'{cur} {word}'.strip()
+                    if self.get_string_width(test) <= max_w:
+                        cur = test
+                    else:
+                        if cur: out.append(cur)
+                        cur = word
+                if cur: out.append(cur)
+            return out
 
-        # Si es una sola línea larga, hacer word-wrap manual
-        if len(lines) == 1 and self.get_string_width(lines[0]) > AW - 3:
-            self.set_font('Helvetica', 'B', 7.5)
-            words = lines[0].split()
-            lines = []
-            cur = ""
-            for w in words:
-                test = f"{cur} {w}".strip()
-                if self.get_string_width(test) <= AW - 3:
-                    cur = test
-                else:
-                    if cur:
-                        lines.append(cur)
-                    cur = w
-            if cur:
-                lines.append(cur)
-        else:
-            self.set_font('Helvetica', 'B', 7.5)
+        pad = 1.0
+        fs = 7.5
+        lines = _wrap(self._safe(display), AW - 2 * pad, fs)
+        while fs > 5.0:
+            self.set_font('Helvetica', 'B', fs)
+            widest = max((self.get_string_width(ln) for ln in lines), default=0)
+            fits_h = len(lines) * (fs * 0.48) <= h - 0.4
+            fits_w = widest <= AW - 2 * pad
+            if fits_h and fits_w:
+                break
+            fs -= 0.5
+            lines = _wrap(self._safe(display), AW - 2 * pad, fs)
 
-        line_h = 4.2
+        self.set_font('Helvetica', 'B', fs)
+        line_h = fs * 0.48
         total_h = len(lines) * line_h
         text_y = y + (h - total_h) / 2
 
         self._tc(BLACK)
         for i, ln in enumerate(lines):
             self.set_xy(ML, text_y + i * line_h)
-            self.cell(AW, line_h, self._safe(ln), align='C')
+            self.cell(AW, line_h, ln, align='C')
         self._reset()
 
     # =====================================================================
@@ -253,7 +292,7 @@ class BoletaSecundariaPDF(FPDF):
         self.set_xy(tx, y0 + 0.2)
         self.set_font('Helvetica', 'B', 10)
         self._tc(BRAND)
-        self.cell(tw, 3.8, self._safe('INSTITUCION EDUCATIVA'),
+        self.cell(tw, 3.8, self._safe('COLEGIO'),
                   align='C', new_x='LMARGIN', new_y='NEXT')
         self.set_x(tx)
         self.set_font('Helvetica', 'BI', 12.5)
@@ -369,8 +408,7 @@ class BoletaSecundariaPDF(FPDF):
             self._hcell(BW, HR1, bim_names[i], bg=BIM_BLUE, size=7.5)
         for i in range(4, len(terms)):
             self._hcell(BW, HR1, terms[i].nombre.upper(), bg=BIM_BLUE, size=7.5)
-        self._hcell(PFW, hdr_h, 'PF', size=8.5)
-        self._hcell(NLW, hdr_h, 'NIVEL\nDE\nLOGRO', size=7,
+        self._hcell(PFW + NLW, HR1, 'PROMEDIO FINAL', size=7,
                     nx='LMARGIN', ny='NEXT')
 
         # ── Fila sub-header P1 P2 PROM ───────────────────────────────────
@@ -380,6 +418,8 @@ class BoletaSecundariaPDF(FPDF):
             self._hcell(P1W, HR2, f'P{base}',  bg=SUB_BLUE, fg=BLACK, size=7.5)
             self._hcell(P2W, HR2, f'P{base+1}', bg=SUB_BLUE, fg=BLACK, size=7.5)
             self._hcell(PMW, HR2, 'PROM',       bg=SUB_BLUE, fg=BLACK, size=7.5)
+        self._hcell(PFW, HR2, 'PROM',  bg=SUB_BLUE, fg=BLACK, size=7.5)
+        self._hcell(NLW, HR2, 'NIVEL', bg=SUB_BLUE, fg=BLACK, size=7.5)
         self.set_x(ML)
         self.set_y(self.get_y() + HR2)
 
@@ -392,15 +432,24 @@ class BoletaSecundariaPDF(FPDF):
             # Detectar áreas de un solo curso (Educación Física, Idioma Inglés, etc.)
             single = (n == 1)
 
+            single_merged = False
             if single:
-                # Área y curso en una sola fila combinada
-                self._hcell(AW + CW, rh, area_display, bg=AREA_BG, fg=BLACK,
-                            size=9, align='L')
-            else:
-                # Celda de área fusionada verticalmente (se dibuja después)
-                pass
+                cid0, cdata0 = items[0]
+                course_name0 = cdata0['course'].nombre or ''
+                area_norm = area_display.replace('\n', ' ').strip().upper()
+                course_norm = course_name0.strip().upper()
+                if area_norm == course_norm:
+                    # Nombres idénticos: fusionar área + asignatura
+                    self._hcell(AW + CW, rh, area_display, bg=AREA_BG, fg=BLACK,
+                                size=9, align='L')
+                    single_merged = True
+                else:
+                    # Nombres distintos: área en AW y asignatura en CW
+                    self._draw_area_cell_direct(area_display, y_area, rh)
+                    self.set_xy(ML + AW, y_area)
+                    self._dcell(CW, rh, course_name0, align='L', size=9)
 
-            # Dibujar cada fila de curso
+            # Dibujar cada fila de curso (solo notas bimestrales)
             for i, (cid, cdata) in enumerate(items):
                 course = cdata['course']
                 row_y = y_area + i * rh
@@ -409,6 +458,9 @@ class BoletaSecundariaPDF(FPDF):
                     self.set_xy(ML + AW, row_y)
                     # Celda de curso
                     self._dcell(CW, rh, course.nombre, align='L', size=9)
+                elif not single_merged:
+                    # El área + curso ya se dibujaron por separado arriba
+                    self.set_xy(ML + AW + CW, row_y)
                 # else: ya se dibujó la celda combinada, posición correcta
 
                 # Notas por bimestre
@@ -425,23 +477,31 @@ class BoletaSecundariaPDF(FPDF):
                     else:
                         self._dcell(PMW, rh, '-', bg=PROM_BG, size=8.5)
 
-                # PF del curso
-                pf_num = cdata.get('promedio_num')
-                pq     = cdata.get('promedio_cual', '--')
-                if pf_num is not None:
-                    self._dcell(PFW, rh, pf_num, bg=PROM_BG, bold=True, size=8)
-                else:
-                    self._dcell(PFW, rh, '-', bg=PROM_BG, size=7.5)
-
-                self._badge(NLW, rh, pq if pq != '--' else None,
-                            size=7.5, nx='LMARGIN', ny='LAST')
-
-            # Dibujar la celda de área fusionada (encima de los cursos)
+            # Dibujar la celda de área fusionada (encima de los cursos) solo en áreas multi-curso
             if not single:
                 self._draw_area_cell_direct(area_display, y_area, area_height)
 
+            # Promedio final del área (num + letra) fusionado verticalmente
+            x_pf = ML + AW + CW + len(terms) * BW
+            nivel_st = student.nivel if getattr(student, 'nivel', None) else 'SECUNDARIA'
+            vals = [d.get('promedio_num') for _, d in items
+                    if d.get('promedio_num') is not None]
+            if vals:
+                avg = _round_half_up(sum(vals) / len(vals))
+                qual = numeric_to_qualitative(avg, nivel_st)
+            else:
+                avg, qual = None, '--'
+            self._draw_area_final(x_pf, y_area, area_height, avg, qual)
+
             # Mover Y al final del grupo
             self.set_y(y_area + area_height)
+
+            # Línea gruesa de separación entre áreas
+            y_sep = self.get_y()
+            self._dc(BLACK)
+            self.set_line_width(0.5)
+            self.line(ML, y_sep, ML + PW, y_sep)
+            self.set_line_width(0.2)
 
         self.ln(1.5)
 
@@ -455,7 +515,7 @@ class BoletaSecundariaPDF(FPDF):
         tt      = ctx['total_tardanzas']
         prom_a  = ctx['promedio_anual']
 
-        sw = 52     # ancho bloque escala
+        sw = 60     # ancho bloque escala
         aw = PW - sw   # asistencia + situación final (debajo de TARDANZAS)
 
         lbl_w  = 20
@@ -497,8 +557,8 @@ class BoletaSecundariaPDF(FPDF):
             for m in meses:
                 a   = att_map.get(m)
                 val = getattr(a, getter, 0) if a else 0
-                self._dcell(mw, RH, f'{val:02d}', size=8.5)
-            self._dcell(tot_w, RH, f'{total:02d}', bg=AREA_BG,
+                self._dcell(mw, RH, f'{val:02d}' if val else '-', size=8.5)
+            self._dcell(tot_w, RH, f'{total:02d}' if total else '-', bg=AREA_BG,
                         bold=True, size=8.5, nx='LMARGIN', ny='NEXT')
 
         # ── Situación final: debajo de TARDANZAS, ancho bloque asistencia ──
@@ -542,7 +602,7 @@ class BoletaSecundariaPDF(FPDF):
         w_half = (PW - GAP) / 2.0
         xL = ML
         xR = ML + w_half + GAP
-        rh = 3.0
+        rh = 3.8
         terms = ctx['terms']
         nt = max(len(terms), 1)
         bim_labels = ['I BIM', 'II BIM', 'III BIM', 'IV BIM']
@@ -592,7 +652,7 @@ class BoletaSecundariaPDF(FPDF):
         if mes_w < 5.0:
             ind_w = max(14, w - prom_w - q_w - 5.0 * nm)
             mes_w = (w - ind_w - prom_w - q_w) / nm
-        fs, fsh = 4.5, 5.0
+        fs, fsh = 6.0, 6.5
         y = y0
         self.set_xy(x0, y)
         self._hcell(ind_w, rh, '', size=fsh)
@@ -630,8 +690,15 @@ class BoletaSecundariaPDF(FPDF):
         self.cell(ind_w, rh, self._safe('PROM. GRAL'), border=1,
                   align='R', fill=True, new_x='RIGHT', new_y='LAST')
         self._reset()
-        for _ in meses:
-            self._dcell(mes_w, rh, '-', size=fs)
+        for mes in meses:
+            month_beh = behavior_bm.get(mes, {})
+            vals = [b.calificacion for b in month_beh.values()
+                    if b and b.calificacion is not None]
+            if vals:
+                avg = round(sum(vals) / len(vals))
+                self._dcell(mes_w, rh, str(avg), bg=PROM_BG, bold=True, size=fs)
+            else:
+                self._dcell(mes_w, rh, '-', size=fs)
         pn = beh_prom.get('promedio_num')
         pq = beh_prom.get('promedio_cual', '--')
         self._dcell(prom_w, rh, str(pn) if pn is not None else '-',

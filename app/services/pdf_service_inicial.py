@@ -7,6 +7,7 @@ import unicodedata
 from fpdf import FPDF
 
 from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
+from app.services.grade_service import _round_half_up, numeric_to_qualitative
 
 
 def _normalize(s: str) -> str:
@@ -30,8 +31,8 @@ LIGHT_GRAY  = (210, 210, 210)
 
 BADGE = {
     'AD': {'bg': (219, 234, 254), 'fg': (30,  64, 175)},
-    'A':  {'bg': (220, 252, 231), 'fg': (22, 101,  52)},
-    'B':  {'bg': (254, 249, 195), 'fg': (113, 63,  18)},
+    'A':  {'bg': (219, 234, 254), 'fg': (30,  64, 175)},
+    'B':  {'bg': (220, 252, 231), 'fg': (22, 101,  52)},
     'C':  {'bg': (254, 226, 226), 'fg': (153, 27,  27)},
 }
 
@@ -127,10 +128,41 @@ class BoletaInicialPDF(FPDF):
         sx, sy = self.get_x(), self.get_y()
         self._fc(AREA_BG); self._dc(BLACK)
         self.rect(x, y, w, h, 'DF')
-        self.set_font('Helvetica', 'B', 7.5)
         self._tc(BLACK)
-        lines = self._safe(text).split('\n')
-        line_h = 4.2
+
+        def _wrap(txt, max_w, fs):
+            self.set_font('Helvetica', 'B', fs)
+            out = []
+            for raw_ln in txt.split('\n'):
+                if self.get_string_width(raw_ln) <= max_w:
+                    out.append(raw_ln); continue
+                words = raw_ln.split()
+                cur = ''
+                for word in words:
+                    test = f'{cur} {word}'.strip()
+                    if self.get_string_width(test) <= max_w:
+                        cur = test
+                    else:
+                        if cur: out.append(cur)
+                        cur = word
+                if cur: out.append(cur)
+            return out
+
+        pad = 0.8
+        fs = 7.5
+        lines = _wrap(self._safe(text), w - 2 * pad, fs)
+        while fs > 5.0:
+            self.set_font('Helvetica', 'B', fs)
+            widest = max((self.get_string_width(ln) for ln in lines), default=0)
+            fits_h = len(lines) * (fs * 0.48) <= h - 0.4
+            fits_w = widest <= w - 2 * pad
+            if fits_h and fits_w:
+                break
+            fs -= 0.5
+            lines = _wrap(self._safe(text), w - 2 * pad, fs)
+
+        self.set_font('Helvetica', 'B', fs)
+        line_h = fs * 0.48
         total_h = len(lines) * line_h
         start_y = y + (h - total_h) / 2
         for i, line in enumerate(lines):
@@ -178,7 +210,7 @@ class BoletaInicialPDF(FPDF):
         self.set_xy(tx, y0 + 0.2)
         self.set_font('Helvetica', 'B', 10)
         self._tc(BRAND)
-        self.cell(tw, 3.8, self._safe('INSTITUCION EDUCATIVA'),
+        self.cell(tw, 3.8, self._safe('COLEGIO'),
                   align='C', new_x='LMARGIN', new_y='NEXT')
 
         self.set_x(tx)
@@ -205,7 +237,7 @@ class BoletaInicialPDF(FPDF):
         self.set_font('Helvetica', 'B', 9)
         self._fc(BRAND); self._tc(WHITE)
         self.cell(PW, 4.8,
-                  self._safe(f'INFORME ACADEMICO: {grado_txt} DE INICIAL'),
+                  self._safe(f'INFORME ACADEMICO: {grado_txt} NIVEL INICIAL'),
                   border=1, align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
         self._reset()
 
@@ -249,8 +281,7 @@ class BoletaInicialPDF(FPDF):
 
         x_pf = x_bim + nt * BW
         self.set_xy(x_pf, y0)
-        self._hcell(PFW, HR1 + HR2, '', size=8)
-        self._hcell(NLW, HR1 + HR2, 'NIVEL DE\nLOGRO', size=6.5)
+        self._hcell(PFW + NLW, HR1, 'PROMEDIO FINAL', size=7)
 
         self.set_xy(x_bim, y_row2)
         for i in range(nt):
@@ -259,6 +290,8 @@ class BoletaInicialPDF(FPDF):
             self._hcell(P2W, HR2, f'P{base+1}', bg=SUB_BLUE, fg=BLACK, size=7.5)
             self._hcell(PMW, HR2, 'PROM',        bg=SUB_BLUE, fg=BLACK, size=7.5)
             self._hcell(QW,  HR2, '',             bg=SUB_BLUE, fg=BLACK, size=7.5)
+        self._hcell(PFW, HR2, 'PROM', bg=SUB_BLUE, fg=BLACK, size=7.5)
+        self._hcell(NLW, HR2, 'NIVEL', bg=SUB_BLUE, fg=BLACK, size=7.5)
 
         self.set_xy(ML, y_data)
 
@@ -276,6 +309,8 @@ class BoletaInicialPDF(FPDF):
             n = len(found)
             y_area = self.get_y()
 
+            nivel = ctx['student'].nivel if ctx.get('student') else 'INICIAL'
+            x_pf = ML + AW + CW + nt * BW
             if n == 1:
                 cid, data = found[0]
                 rendered_cids.add(cid)
@@ -283,6 +318,9 @@ class BoletaInicialPDF(FPDF):
                 self._dcell(AW + CW, RH, area_display, bg=AREA_BG, bold=True,
                             align='L', size=8)
                 self._draw_course_grades_row(cid, data, terms, eda_data)
+                avg = data.get('promedio_num')
+                qual = data.get('promedio_cual', '--')
+                self._draw_area_final(x_pf, y_area, RH, avg, qual)
                 self.set_xy(ML, y_area + RH)
             else:
                 area_h = n * RH
@@ -293,9 +331,25 @@ class BoletaInicialPDF(FPDF):
                     self.set_xy(ML + AW, row_y)
                     self._dcell(CW, RH, data['course'].nombre, align='L', size=8)
                     self._draw_course_grades_row(cid, data, terms, eda_data)
+                vals = [d.get('promedio_num') for _, d in found
+                        if d.get('promedio_num') is not None]
+                if vals:
+                    avg = _round_half_up(sum(vals) / len(vals))
+                    qual = numeric_to_qualitative(avg, nivel)
+                else:
+                    avg, qual = None, '--'
+                self._draw_area_final(x_pf, y_area, area_h, avg, qual)
                 self.set_xy(ML, y_area + area_h)
 
+            y_sep = self.get_y()
+            self._dc(BLACK)
+            self.set_line_width(0.5)
+            self.line(ML, y_sep, ML + PW, y_sep)
+            self.set_line_width(0.2)
+
         # ── Cursos en el matrix que no estaban en el layout
+        nivel = ctx['student'].nivel if ctx.get('student') else 'INICIAL'
+        x_pf = ML + AW + CW + nt * BW
         for cid, data in matrix.items():
             if cid in rendered_cids:
                 continue
@@ -305,11 +359,15 @@ class BoletaInicialPDF(FPDF):
             self._dcell(AW + CW, RH, area_label, bg=AREA_BG, bold=True,
                         align='L', size=8)
             self._draw_course_grades_row(cid, data, terms, eda_data)
+            avg = data.get('promedio_num')
+            qual = data.get('promedio_cual', '--')
+            self._draw_area_final(x_pf, y_area, RH, avg, qual)
             self.set_xy(ML, y_area + RH)
 
         self.ln(1.5)
 
     def _draw_course_grades_row(self, cid, data, terms, eda_data):
+        """Dibuja las notas bimestrales del curso (sin PF/Nivel)."""
         for term in terms:
             v1 = eda_data.get(term.id, {}).get(1, {}).get(cid)
             v2 = eda_data.get(term.id, {}).get(2, {}).get(cid)
@@ -325,14 +383,32 @@ class BoletaInicialPDF(FPDF):
                 self._dcell(PMW, RH, '-', bg=PROM_BG, size=8.5)
                 self._badge(QW, RH, None, size=8.5)
 
-        pf_num = data.get('promedio_num')
-        if pf_num is not None:
-            self._dcell(PFW, RH, pf_num, bg=PROM_BG, bold=True, size=8)
-        else:
-            self._dcell(PFW, RH, '-', bg=PROM_BG, size=7.5)
+    def _draw_area_final(self, x, y, h, avg, qual):
+        """Celda PROMEDIO FINAL fusionada: sub-columna numérica + sub-columna letra."""
+        self._fc(PROM_BG); self._dc(BLACK)
+        self.rect(x, y, PFW, h, style='DF')
+        self.set_font('Helvetica', 'B', 9.5)
+        self._tc(BLACK)
+        txt = str(avg) if avg is not None else '-'
+        self.set_xy(x, y + (h - 4.2) / 2)
+        self.cell(PFW, 4.2, self._safe(txt), align='C')
 
-        pq = data.get('promedio_cual', '--')
-        self._badge(NLW, RH, pq if pq != '--' else None, size=7.5)
+        if qual and qual in BADGE:
+            b = BADGE[qual]
+            self._fc(b['bg']); self._dc(BLACK)
+            self.rect(x + PFW, y, NLW, h, style='DF')
+            self.set_font('Helvetica', 'B', 10)
+            self._tc(b['fg'])
+            self.set_xy(x + PFW, y + (h - 4.2) / 2)
+            self.cell(NLW, 4.2, qual, align='C')
+        else:
+            self._fc(WHITE); self._dc(BLACK)
+            self.rect(x + PFW, y, NLW, h, style='DF')
+            self.set_font('Helvetica', '', 9)
+            self._tc(GRAY)
+            self.set_xy(x + PFW, y + (h - 4.2) / 2)
+            self.cell(NLW, 4.2, '-', align='C')
+        self._reset()
 
     def _scale_attendance(self, ctx):
         meses   = ctx['meses']
@@ -341,7 +417,7 @@ class BoletaInicialPDF(FPDF):
         tt      = ctx['total_tardanzas']
         prom_a  = ctx['promedio_anual']
 
-        sw = 52
+        sw = 60
         aw = PW - sw
 
         lbl_w = 20
@@ -383,8 +459,8 @@ class BoletaInicialPDF(FPDF):
             for m in meses:
                 a   = att_map.get(m)
                 val = getattr(a, getter, 0) if a else 0
-                self._dcell(mw, RH, f'{val:02d}', size=8.5)
-            self._dcell(tot_w, RH, f'{total:02d}', bg=AREA_BG,
+                self._dcell(mw, RH, f'{val:02d}' if val else '-', size=8.5)
+            self._dcell(tot_w, RH, f'{total:02d}' if total else '-', bg=AREA_BG,
                         bold=True, size=8.5, nx='LMARGIN', ny='NEXT')
 
         # ── Situación final: debajo de TARDANZAS
@@ -424,7 +500,7 @@ class BoletaInicialPDF(FPDF):
         w_half = (PW - GAP) / 2.0
         xL = ML
         xR = ML + w_half + GAP
-        rh = 3.0
+        rh = 3.8
         terms = ctx['terms']
         nt = max(len(terms), 1)
         bim_labels = ['I BIM', 'II BIM', 'III BIM', 'IV BIM']
@@ -473,7 +549,7 @@ class BoletaInicialPDF(FPDF):
         if mes_w < 5.0:
             ind_w = max(14, w - prom_w - q_w - 5.0 * nm)
             mes_w = (w - ind_w - prom_w - q_w) / nm
-        fs, fsh = 4.5, 5.0
+        fs, fsh = 6.0, 6.5
         y = y0
         self.set_xy(x0, y)
         self._hcell(ind_w, rh, '', size=fsh)
@@ -511,8 +587,15 @@ class BoletaInicialPDF(FPDF):
         self.cell(ind_w, rh, self._safe('PROM. GRAL'), border=1,
                   align='R', fill=True, new_x='RIGHT', new_y='LAST')
         self._reset()
-        for _ in meses:
-            self._dcell(mes_w, rh, '-', size=fs)
+        for mes in meses:
+            month_beh = behavior_bm.get(mes, {})
+            vals = [b.calificacion for b in month_beh.values()
+                    if b and b.calificacion is not None]
+            if vals:
+                avg = round(sum(vals) / len(vals))
+                self._dcell(mes_w, rh, str(avg), bg=PROM_BG, bold=True, size=fs)
+            else:
+                self._dcell(mes_w, rh, '-', size=fs)
         pn = beh_prom.get('promedio_num')
         pq = beh_prom.get('promedio_cual', '--')
         self._dcell(prom_w, rh, str(pn) if pn is not None else '-',
@@ -627,7 +710,13 @@ class BoletaInicialPDF(FPDF):
         tutor = (fb.get("tutor") or "").strip()
         st = ctx["student"]
         coord_lbl = "COORDINADOR(A)" if st.nivel == "SECUNDARIA" else "COORDINADORA"
-        self.ln(4)
+
+        # Posicionar al final de la página
+        target_y = self.h - self.b_margin - 18
+        if self.get_y() < target_y:
+            self.set_y(target_y)
+        else:
+            self.ln(2)
         self.set_x(ML)
         self._sig_line(sw, coord, line)
         self._sig_line(sw, (fb.get("director") or "").strip() or DEFAULT_DIRECTOR_GENERAL, line)
