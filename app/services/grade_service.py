@@ -35,6 +35,20 @@ def _round_half_up(x: float) -> int:
     return int(x + 0.5)
 
 
+def format_nota(value) -> str:
+    """Formatea una nota numérica con cero a la izquierda (01, 02, ..., 09, 10, ...).
+
+    Devuelve '-' si el valor es None. Preserva valores no numéricos tal cual.
+    """
+    if value is None:
+        return '-'
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return f'{int(value):02d}'
+    return str(value)
+
+
 def upsert_grade(student_id: int, course_id: int, term_id: int, numeric_value: Optional[int]) -> Grade:
     """Crea o actualiza una nota. Valida rango 0-20."""
     if numeric_value is not None and not (0 <= numeric_value <= 20):

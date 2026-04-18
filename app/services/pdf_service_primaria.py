@@ -7,7 +7,7 @@ import unicodedata
 from fpdf import FPDF
 
 from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
-from app.services.grade_service import _round_half_up, numeric_to_qualitative
+from app.services.grade_service import _round_half_up, numeric_to_qualitative, format_nota
 
 
 def _normalize(s: str) -> str:
@@ -454,11 +454,11 @@ class BoletaPrimariaPDF(FPDF):
             v2 = eda_data.get(term.id, {}).get(2, {}).get(cid)
             g  = data['terms'].get(term.id)
 
-            self._dcell(P1W, RH, v1 if v1 is not None else '-', size=8.5)
-            self._dcell(P2W, RH, v2 if v2 is not None else '-', size=8.5)
+            self._dcell(P1W, RH, format_nota(v1), size=8.5)
+            self._dcell(P2W, RH, format_nota(v2), size=8.5)
 
             if g and g.numeric_value is not None:
-                self._dcell(PMW, RH, g.numeric_value, bg=PROM_BG, bold=True, size=9)
+                self._dcell(PMW, RH, format_nota(g.numeric_value), bg=PROM_BG, bold=True, size=9)
                 self._badge(QW, RH, g.qualitative_grade, size=9)
             else:
                 self._dcell(PMW, RH, '-', bg=PROM_BG, size=8.5)
@@ -470,7 +470,7 @@ class BoletaPrimariaPDF(FPDF):
         self.rect(x, y, PFW, h, style='DF')
         self.set_font('Helvetica', 'B', 9.5)
         self._tc(BLACK)
-        txt = str(avg) if avg is not None else '-'
+        txt = format_nota(avg)
         self.set_xy(x, y + (h - 4.2) / 2)
         self.cell(PFW, 4.2, self._safe(txt), align='C')
 
@@ -653,12 +653,12 @@ class BoletaPrimariaPDF(FPDF):
                 month_beh = behavior_bm.get(mes, {})
                 b = month_beh.get(ind)
                 cal = b.calificacion if b and b.calificacion is not None else None
-                self._dcell(mes_w, rh, str(cal) if cal is not None else '-',
+                self._dcell(mes_w, rh, format_nota(cal),
                             bold=cal is not None, size=fs)
             ind_avg = beh_ind_avgs.get(ind, {})
             pn = ind_avg.get('promedio_num')
             pq = ind_avg.get('promedio_cual', '--')
-            self._dcell(prom_w, rh, str(pn) if pn is not None else '-',
+            self._dcell(prom_w, rh, format_nota(pn),
                         bg=PROM_BG, bold=pn is not None, size=fs)
             self._badge(q_w, rh, pq if pq != '--' else None, size=7, nx='RIGHT', ny='NEXT')
             self._reset()
@@ -676,12 +676,12 @@ class BoletaPrimariaPDF(FPDF):
                     if b and b.calificacion is not None]
             if vals:
                 avg = round(sum(vals) / len(vals))
-                self._dcell(mes_w, rh, str(avg), bg=PROM_BG, bold=True, size=fs)
+                self._dcell(mes_w, rh, format_nota(avg), bg=PROM_BG, bold=True, size=fs)
             else:
                 self._dcell(mes_w, rh, '-', size=fs)
         pn = beh_prom.get('promedio_num')
         pq = beh_prom.get('promedio_cual', '--')
-        self._dcell(prom_w, rh, str(pn) if pn is not None else '-',
+        self._dcell(prom_w, rh, format_nota(pn),
                     bg=PROM_BG, bold=pn is not None, size=fs)
         self._badge(q_w, rh, pq if pq != '--' else None, size=7, nx='RIGHT', ny='NEXT')
         self._reset()
@@ -739,12 +739,12 @@ class BoletaPrimariaPDF(FPDF):
             for term in terms:
                 p = ppff_bt.get(term.id, {}).get(ind)
                 cal = p.calificacion if p and p.calificacion is not None else None
-                self._dcell(bim_w, h_criterio, str(cal) if cal is not None else '-',
+                self._dcell(bim_w, h_criterio, format_nota(cal),
                             bold=cal is not None, size=fs_bar)
             ind_avg = ppff_ind_avgs.get(ind, {})
             pn = ind_avg.get('promedio_num')
             pq = ind_avg.get('promedio_cual', '--')
-            self._dcell(prom_w, h_criterio, str(pn) if pn is not None else '-',
+            self._dcell(prom_w, h_criterio, format_nota(pn),
                         bg=PROM_BG, bold=pn is not None, size=fs_bar)
             self._badge(q_w, h_criterio, pq if pq != '--' else None, size=7,
                         nx='RIGHT', ny='NEXT')

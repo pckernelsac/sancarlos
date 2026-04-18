@@ -6,6 +6,7 @@ from collections import OrderedDict
 from fpdf import FPDF
 
 from app.services.boleta_staff_service import DEFAULT_DIRECTOR_GENERAL
+from app.services.grade_service import format_nota
 
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 BRAND       = (14,  47, 119)   # #0e2f77
@@ -312,18 +313,18 @@ class BoletaPDF(FPDF):
             v2 = eda_data.get(term.id, {}).get(2, {}).get(cid)
             g  = data['terms'].get(term.id)
 
-            self._dcell(P1W, RH, v1 if v1 is not None else '-')
-            self._dcell(P2W, RH, v2 if v2 is not None else '-')
+            self._dcell(P1W, RH, format_nota(v1))
+            self._dcell(P2W, RH, format_nota(v2))
 
             if g and g.numeric_value is not None:
-                self._dcell(PMW, RH, g.numeric_value, bg=PROM_BG, bold=True)
+                self._dcell(PMW, RH, format_nota(g.numeric_value), bg=PROM_BG, bold=True)
             else:
                 self._dcell(PMW, RH, '-', bg=PROM_BG)
 
         # PF (promedio final)
         pf_num = data.get('promedio_num')
         if pf_num is not None:
-            self._dcell(PFW, RH, pf_num, bg=PROM_BG, bold=True)
+            self._dcell(PFW, RH, format_nota(pf_num), bg=PROM_BG, bold=True)
         else:
             self._dcell(PFW, RH, '-', bg=PROM_BG)
 

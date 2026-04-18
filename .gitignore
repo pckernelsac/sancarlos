@@ -19,4 +19,6 @@ tmp/
 node_modules/
 boleta_*_test*.pdf
 boleta_secundaria_test.pdf
+boleta_primaria_notas_bajas.pdf
 scripts/gen_test_pdfs.py
+scripts/gen_test_pdf_low.py
