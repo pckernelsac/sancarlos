@@ -398,7 +398,14 @@ class BoletaSecundariaPDF(FPDF):
 
         # ── Calcular alto de fila dinámico según cantidad de cursos ──────
         total_courses = sum(len(items) for items in sorted_groups.values())
-        rh = 4.0 if total_courses > 20 else (4.3 if total_courses > 18 else RH)
+        if total_courses > 22:
+            rh = 3.6
+        elif total_courses > 20:
+            rh = 4.0
+        elif total_courses > 18:
+            rh = 4.3
+        else:
+            rh = RH
 
         # ── Fila header superior ─────────────────────────────────────────
         hdr_h = HR1 + HR2
@@ -799,7 +806,7 @@ class BoletaSecundariaPDF(FPDF):
                       fill=True, new_x='LMARGIN', new_y='NEXT')
             self._reset()
 
-        self.ln(17)
+        self.ln(4)
 
     # =====================================================================
     # FIRMAS
