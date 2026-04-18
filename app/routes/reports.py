@@ -72,6 +72,15 @@ def _build_boleta_context(student_id: int, anio: int, staff_map: dict | None = N
     all_vals = [d["promedio_num"] for d in matrix.values() if d["promedio_num"] is not None]
     promedio_anual = round(sum(all_vals) / len(all_vals)) if all_vals else None
 
+    bimestres_completos = (
+        len(terms) >= 4
+        and bool(matrix)
+        and all(
+            all(g is not None and g.numeric_value is not None for g in d["terms"].values())
+            for d in matrix.values()
+        )
+    )
+
     behavior_avg = get_behavior_average(student_id, anio, student.nivel)
     behavior_by_term = get_student_behavior_all_terms(student_id, anio)
     behavior_ind_avgs = get_behavior_indicator_averages(
@@ -107,6 +116,7 @@ def _build_boleta_context(student_id: int, anio: int, staff_map: dict | None = N
         "ppff_by_term": ppff_by_term, "ppff_promedio": ppff_avg,
         "ppff_ind_avgs": ppff_ind_avgs, "meses": MESES,
         "comments_per_term": comments_per_term, "promedio_anual": promedio_anual,
+        "bimestres_completos": bimestres_completos,
         "anio": anio, "fecha_emision": datetime.date.today().strftime("%d/%m/%Y"),
         "firma_boleta": firma_boleta_for_student(student, staff_map),
         "firma_coord_label": firma_coord_label_for_nivel(student.nivel),

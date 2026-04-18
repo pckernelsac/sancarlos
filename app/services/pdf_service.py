@@ -341,6 +341,7 @@ class BoletaPDF(FPDF):
         tf      = ctx['total_faltas']
         tt      = ctx['total_tardanzas']
         prom_a  = ctx['promedio_anual']
+        bim_ok  = ctx.get('bimestres_completos', False)
 
         sw = 52    # escala de valores
         pw = 22    # sello promovido
@@ -393,20 +394,21 @@ class BoletaPDF(FPDF):
         px = ML + sw + aw
         cy = y0 + 10
 
-        if prom_a is not None and prom_a >= 11:
+        if bim_ok and prom_a is not None and prom_a >= 11:
             plines = ['Promovido']
-        elif prom_a is not None:
+        elif bim_ok and prom_a is not None:
             plines = ['No Promovido']
         else:
-            plines = ['En Proceso']
+            plines = []
 
-        self.set_font('Helvetica', 'BI', 7)
-        self._tc(BRAND)
-        base_y = cy - len(plines) * 3.5 / 2
-        for i, ln in enumerate(plines):
-            self.set_xy(px, base_y + i * 3.5)
-            self.cell(pw, 3.5, ln, align='C', new_x='LMARGIN', new_y='NEXT')
-        self._reset()
+        if plines:
+            self.set_font('Helvetica', 'BI', 7)
+            self._tc(BRAND)
+            base_y = cy - len(plines) * 3.5 / 2
+            for i, ln in enumerate(plines):
+                self.set_xy(px, base_y + i * 3.5)
+                self.cell(pw, 3.5, ln, align='C', new_x='LMARGIN', new_y='NEXT')
+            self._reset()
 
         # Avanzar Y al máximo entre escala (4 filas) y asistencia (2 filas)
         scale_h = 4.5 + RH * 4

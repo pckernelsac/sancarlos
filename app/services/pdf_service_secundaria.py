@@ -514,6 +514,7 @@ class BoletaSecundariaPDF(FPDF):
         tf      = ctx['total_faltas']
         tt      = ctx['total_tardanzas']
         prom_a  = ctx['promedio_anual']
+        bim_ok  = ctx.get('bimestres_completos', False)
 
         sw = 60     # ancho bloque escala
         aw = PW - sw   # asistencia + situación final (debajo de TARDANZAS)
@@ -565,28 +566,27 @@ class BoletaSecundariaPDF(FPDF):
         y_prom = y0 + 4.5 + RH + RH + 0.6
         x_att = ML + sw
         h_box = 10.0
-        if prom_a is not None and prom_a >= 11:
+        if bim_ok and prom_a is not None and prom_a >= 11:
             txt = 'Promovido'
             fill_rgb = (220, 252, 231)
             text_rgb = (21, 128, 61)
-        elif prom_a is not None:
+        elif bim_ok and prom_a is not None:
             txt = 'No Promovido'
             fill_rgb = (254, 226, 226)
             text_rgb = (153, 27, 27)
         else:
-            txt = 'En Proceso'
-            fill_rgb = (254, 249, 195)
-            text_rgb = (113, 63, 18)
+            txt = None
 
-        self._dc(BRAND)
-        self.set_fill_color(*fill_rgb)
-        self.rect(x_att, y_prom, aw, h_box, style='DF')
-        self.set_font('Helvetica', 'BI', 15)
-        self._tc(text_rgb)
-        self.set_xy(x_att, y_prom + 2.0)
-        self.cell(aw, h_box - 2.4, self._safe(txt), align='C',
-                  new_x='LMARGIN', new_y='NEXT')
-        self._reset()
+        if txt is not None:
+            self._dc(BRAND)
+            self.set_fill_color(*fill_rgb)
+            self.rect(x_att, y_prom, aw, h_box, style='DF')
+            self.set_font('Helvetica', 'BI', 15)
+            self._tc(text_rgb)
+            self.set_xy(x_att, y_prom + 2.0)
+            self.cell(aw, h_box - 2.4, self._safe(txt), align='C',
+                      new_x='LMARGIN', new_y='NEXT')
+            self._reset()
 
         # Avanzar Y al máximo entre escala (4 filas) y asistencia + sello
         scale_h = 4.5 + RH * 4
@@ -602,7 +602,7 @@ class BoletaSecundariaPDF(FPDF):
         w_half = (PW - GAP) / 2.0
         xL = ML
         xR = ML + w_half + GAP
-        rh = 3.8
+        rh = RH
         terms = ctx['terms']
         nt = max(len(terms), 1)
         bim_labels = ['I BIM', 'II BIM', 'III BIM', 'IV BIM']
@@ -610,11 +610,11 @@ class BoletaSecundariaPDF(FPDF):
         mes_labels = [m[:3].upper() for m in meses]
 
         y0 = self.get_y()
-        self.set_font('Helvetica', 'B', 5.5)
+        self.set_font('Helvetica', 'B', 7)
         self._fc(BRAND); self._tc(WHITE)
         self.set_xy(xL, y0)
         self.multi_cell(
-            PW, 2.35,
+            PW, 4.5,
             self._safe(
                 'EVALUACIÓN DEL COMPORTAMIENTO DEL ALUMNO(A) DENTRO DE LA I.E.'),
             border=1, align='C', fill=True)
@@ -627,12 +627,12 @@ class BoletaSecundariaPDF(FPDF):
 
         # PPFF panel below
         y2 = self.get_y()
-        self.set_font('Helvetica', 'B', 5.5)
+        self.set_font('Helvetica', 'B', 7)
         self._fc(BRAND); self._tc(WHITE)
         self.set_xy(xL, y2)
         self.multi_cell(
-            w_half, 2.35,
-            self._safe('EVALUACIÓN DE RESPONSABILIDAD DEL PPFF\nO APODERADO'),
+            w_half, 4.5,
+            self._safe('EVALUACIÓN DE RESPONSABILIDAD DEL PPFF O APODERADO'),
             border=1, align='C', fill=True)
         self._reset()
         y3 = self.get_y()
@@ -647,12 +647,12 @@ class BoletaSecundariaPDF(FPDF):
         beh_ind_avgs = ctx.get('behavior_monthly_ind_avgs', {})
         nm = len(meses) if meses else 10
         q_w, prom_w = 6.0, 7.0
-        ind_w = min(22, max(16, int(w * 0.16)))
+        ind_w = min(40, max(34, int(w * 0.18)))
         mes_w = (w - ind_w - prom_w - q_w) / nm
         if mes_w < 5.0:
             ind_w = max(14, w - prom_w - q_w - 5.0 * nm)
             mes_w = (w - ind_w - prom_w - q_w) / nm
-        fs, fsh = 6.0, 6.5
+        fs, fsh = 7.5, 7.5
         y = y0
         self.set_xy(x0, y)
         self._hcell(ind_w, rh, '', size=fsh)
@@ -722,10 +722,9 @@ class BoletaSecundariaPDF(FPDF):
         if bim_w < 7.5:
             desc_w = max(24, w - prom_w - q_w - 7.5 * nt)
             bim_w = (w - desc_w - prom_w - q_w) / nt
-        # Misma tipografía que las barras de título (Helvetica B 5.5, multi_cell h=2.35)
-        fs_bar = 5.5
-        line_h = 2.35
-        pad = 0.45
+        fs_bar = 7.5
+        line_h = 2.9
+        pad = 0.5
         rh_head = rh
         y = y0
         self.set_xy(x0, y)
